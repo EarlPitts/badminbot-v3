@@ -11,9 +11,25 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: cachix/install-nix-action@v27
+      - uses: haskell-actions/setup@v2
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
+          ghc-version: '9.6.6'
+          cabal-version: 'latest'
 
-      # Run commands inside the devShell
-      - run: nix develop --command bash -c "cabal update && cabal test"
+      - name: Install system deps
+        run: sudo apt-get install -y libzlib-dev
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cabal/packages
+            ~/.cabal/store
+            dist-newstyle
+          key: cabal-${{ runner.os }}-${{ hashFiles('**/*.cabal', 'cabal.project') }}
+          restore-keys: cabal-${{ runner.os }}-
+
+      - name: Update cabal
+        run: cabal update
+
+      - name: Run tests
+        run: cabal test
