@@ -2,31 +2,34 @@
 
 module Bot (runBot) where
 
-import Control.Monad (void, when)
+import Control.Monad (unless, void, when)
 import Data.Text (Text, isPrefixOf, pack, toLower)
 import qualified Data.Text.IO as TIO
 import System.Environment
 import UnliftIO.Concurrent
 
+import Control.Monad.IO.Class
 import Discord
 import qualified Discord.Requests as R
 import Discord.Types
 
+data Command = CreatePoll
+
 runBot :: IO ()
 runBot = do
   token <- pack <$> getEnv "TOKEN"
-  pingpongExample token
+  badminbot token
 
--- | Replies "pong" to every message that starts with "ping"
-pingpongExample :: Text -> IO ()
-pingpongExample token = do
+badminbot :: Text -> IO ()
+badminbot token = do
+  putStrLn "started..."
   userFacingError <-
     runDiscord $
       def
         { discordToken = "Bot " <> token
         , discordOnEvent = eventHandler
         , discordOnLog = \s -> TIO.putStrLn s >> TIO.putStrLn ""
-        } -- if you see OnLog error, post in the discord / open an issue
+        }
   TIO.putStrLn userFacingError
 
 -- userFacingError is an unrecoverable error
@@ -34,11 +37,25 @@ pingpongExample token = do
 
 eventHandler :: Event -> DiscordHandler ()
 eventHandler event = case event of
-  MessageCreate m -> when (isPing m && not (fromBot m)) $ do
-    void $ restCall (R.CreateReaction (messageChannelId m, messageId m) "eyes")
-    threadDelay (2 * 10 ^ 6)
-    void $ restCall (R.CreateMessage (messageChannelId m) "Pong!")
+  MessageCreate msg -> handleMessage msg
+  -- MessageCreate m -> when (isPing m && not (fromBot m)) $ do
+  --   void $ restCall (R.CreateReaction (messageChannelId m, messageId m) "eyes")
+  --   threadDelay (2 * 10 ^ 6)
+  --   void $ restCall (R.CreateMessage (messageChannelId m) "Pong!")
   _ -> return ()
+
+handleMessage :: Message -> DiscordHandler ()
+handleMessage msg = unless (fromBot msg) $ do
+  let cmd = getCmd (messageContent msg)
+  case cmd of
+    Just CreatePoll -> liftIO createPoll
+    Nothing -> void $ restCall (R.CreateMessage (messageChannelId msg) "Sorry, didn't understand :(")
+
+createPoll :: IO ()
+createPoll = undefined
+
+getCmd :: Text -> Maybe Command
+getCmd msg = Nothing
 
 fromBot :: Message -> Bool
 fromBot = userIsBot . messageAuthor
