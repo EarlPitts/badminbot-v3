@@ -27,10 +27,12 @@
             hlint
             cabal-fmt
             pkgs.zlib
+            pkgs.zstd
           ];
 
           LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
             pkgs.zlib
+            pkgs.zstd
           ];
         };
       }
