@@ -16,4 +16,4 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
 
       # Run commands inside the devShell
-      - run: nix develop --command bash -c "cabal test"
+      - run: nix develop --command bash -c "cabal update && cabal test"
