@@ -12,6 +12,7 @@ import Control.Monad.IO.Class
 import Discord
 import qualified Discord.Requests as R
 import Discord.Types
+import qualified Poll as P
 
 data Command = CreatePoll
 
@@ -48,11 +49,9 @@ handleMessage :: Message -> DiscordHandler ()
 handleMessage msg = unless (fromBot msg) $ do
   let cmd = getCmd (messageContent msg)
   case cmd of
-    Just CreatePoll -> liftIO createPoll
+    Just CreatePoll -> undefined
     Nothing -> void $ restCall (R.CreateMessage (messageChannelId msg) "Sorry, didn't understand :(")
 
-createPoll :: IO ()
-createPoll = undefined
 
 getCmd :: Text -> Maybe Command
 getCmd msg = Nothing
