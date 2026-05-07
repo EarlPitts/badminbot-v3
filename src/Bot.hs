@@ -15,16 +15,6 @@ import Discord.Types
 import qualified Poll as P
 
 import Control.Monad
-import Control.Monad.IO.Class
-import Data.Aeson (Value)
-import qualified Data.ByteString.Char8 as B
-import Data.Maybe (fromJust)
-import Data.Monoid ((<>))
-import Data.Time (getCurrentTimeZone, localTimeToUTC, utcToLocalTime)
-import Data.Time.Clock (getCurrentTime)
-import GHC.Generics
-import Network.HTTP.Req
-import qualified Text.URI as URI
 
 data Command = CreatePoll
 
@@ -61,23 +51,8 @@ handleMessage :: Message -> DiscordHandler ()
 handleMessage msg = unless (fromBot msg) $ do
   let cmd = getCmd (messageContent msg)
   case cmd of
-    Just CreatePoll -> liftIO createPoll
+    Just CreatePoll -> liftIO P.createPoll
     Nothing -> void $ restCall (R.CreateMessage (messageChannelId msg) "Sorry, didn't understand :(")
-
-createPoll :: IO ()
-createPoll = do
-  d <- utctDay <$> getCurrentTime
-  tz <- getCurrentTimeZone
-
-  let
-    week = P.defaultDays d
-    weekNum = show $ P.weekNum (head week)
-    title = "Tollas (hét #" <> weekNum <> ")"
-    poll = P.mkPoll tz title week P.defaultHours
-
-  runReq defaultHttpConfig $ do
-    v <- req POST (https "api.strawpoll.com" /: "v3/polls") (ReqBodyJson poll) jsonResponse mempty
-    liftIO $ print (responseBody v :: Value)
 
 getCmd :: Text -> Maybe Command
 getCmd msg = Nothing

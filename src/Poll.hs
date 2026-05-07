@@ -12,6 +12,9 @@ import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import Data.Time.LocalTime
 
+import Control.Monad.IO.Class
+import Network.HTTP.Req
+
 nextWeek :: Day -> [Day]
 nextWeek = weekAllDays Monday . firstDayOfWeekOnAfter Monday
 
@@ -76,3 +79,18 @@ mkEvent :: TimeZone -> Day -> DiffTime -> Event
 mkEvent tz day start = Event (shiftTz start) (shiftTz (start + oneHour))
  where
   shiftTz = localTimeToUTC tz . LocalTime day . timeToTimeOfDay
+
+createPoll :: IO ()
+createPoll = do
+  d <- utctDay <$> getCurrentTime
+  tz <- getCurrentTimeZone
+
+  let
+    week = defaultDays d
+    wNum = show $ weekNum (head week)
+    title = "Tollas (hét #" <> wNum <> ")"
+    poll = mkPoll tz title week defaultHours
+
+  runReq defaultHttpConfig $ do
+    v <- req POST (https "api.strawpoll.com" /: "v3/polls") (ReqBodyJson poll) jsonResponse mempty
+    liftIO $ print (responseBody v :: Value)
