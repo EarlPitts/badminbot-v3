@@ -1,29 +1,24 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TypeApplications #-}
 
 module Poll where
 
 import Data.Time.Calendar
-import Data.Time.Calendar
 import Data.Time.Clock as C
 
-import Control.Monad
-import Control.Monad.IO.Class
 import Data.Aeson
-import qualified Data.ByteString.Char8 as B
-import Data.Maybe (fromJust)
-import Data.Monoid ((<>))
 import Data.Text (Text)
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
-import GHC.Generics
-import Network.HTTP.Req
-import qualified Text.URI as URI
+import Data.Time.LocalTime
 
 defaultDays = weekAllDays Monday . firstDayOfWeekOnAfter Monday
-defaultHours = secondsToDiffTime <$> [8 .. 22]
+defaultHours = [start, start + oneHour .. (end - oneHour)]
+ where
+  start = 8 * oneHour
+  end = 22 * oneHour
+
+oneHour :: DiffTime
+oneHour = 3600
 
 data Poll = Poll
   { title :: String
@@ -62,32 +57,19 @@ instance ToJSON Event where
       , "type" .= ("time_range" :: Text)
       ]
 
-mkPoll :: String -> [Day] -> [DiffTime] -> Poll
-mkPoll title days hours = Poll{..}
+mkPoll :: TimeZone -> String -> [Day] -> [DiffTime] -> Poll
+mkPoll tz title days hours = Poll{..}
  where
-  options = mkEvents days hours
+  options = mkEvent tz <$> days <*> hours
 
-mkEvents :: [Day] -> [DiffTime] -> [Event]
-mkEvents days hours = mkEvent <$> days <*> hours
-
-mkEvent :: Day -> DiffTime -> Event
-mkEvent day hour =
-  Event
-    { startTime = UTCTime day (hour * 3600)
-    , endTime = UTCTime day ((hour + 1) * 3600)
-    }
+mkEvent :: TimeZone -> Day -> DiffTime -> Event
+mkEvent tz day start = Event (shiftTz start) (shiftTz (start + oneHour))
+ where
+  shiftTz = localTimeToUTC tz . LocalTime day . timeToTimeOfDay
 
 f = do
   t <- getCurrentTime
+  tz <- getCurrentTimeZone
   let d = utctDay t
   let title = "sajt"
-
-  pure $ mkPoll title [d] defaultHours
-
-main :: IO ()
-main = do
-  d <- utctDay <$> getCurrentTime
-  runReq defaultHttpConfig $ do
-    let myData = mkPoll "testpoll" (defaultDays d) defaultHours
-    v <- req POST (https "api.strawpoll.com" /: "v3/polls") (ReqBodyJson myData) jsonResponse mempty
-    liftIO $ print (responseBody v :: Value)
+  pure $ mkEvent tz d <$> defaultHours
