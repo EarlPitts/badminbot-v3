@@ -51,11 +51,13 @@ handleMessage :: Message -> DiscordHandler ()
 handleMessage msg = unless (fromBot msg) $ do
   let cmd = getCmd (messageContent msg)
   case cmd of
-    Just CreatePoll -> liftIO P.createPoll
+    Just CreatePoll -> do
+      P.PollResponse url <- liftIO P.createPoll -- TODO retry if didn't succeed
+      void $ restCall (R.CreateMessage (messageChannelId msg) url)
     Nothing -> void $ restCall (R.CreateMessage (messageChannelId msg) "Sorry, didn't understand :(")
 
 getCmd :: Text -> Maybe Command
-getCmd msg = Nothing
+getCmd msg = Just CreatePoll
 
 fromBot :: Message -> Bool
 fromBot = userIsBot . messageAuthor

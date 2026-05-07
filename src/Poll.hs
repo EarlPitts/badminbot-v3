@@ -80,7 +80,16 @@ mkEvent tz day start = Event (shiftTz start) (shiftTz (start + oneHour))
  where
   shiftTz = localTimeToUTC tz . LocalTime day . timeToTimeOfDay
 
-createPoll :: IO ()
+newtype PollResponse = PollResponse
+  { url :: Text
+  }
+  deriving (Show)
+
+instance FromJSON PollResponse where
+  parseJSON = withObject "PollResponse" $ \obj ->
+    PollResponse <$> obj .: "url"
+
+createPoll :: IO PollResponse
 createPoll = do
   d <- utctDay <$> getCurrentTime
   tz <- getCurrentTimeZone
@@ -91,6 +100,13 @@ createPoll = do
     title = "Tollas (hét #" <> wNum <> ")"
     poll = mkPoll tz title week defaultHours
 
-  runReq defaultHttpConfig $ do
-    v <- req POST (https "api.strawpoll.com" /: "v3/polls") (ReqBodyJson poll) jsonResponse mempty
-    liftIO $ print (responseBody v :: Value)
+  responseBody
+    <$> runReq
+      defaultHttpConfig
+      ( req
+          POST
+          (https "api.strawpoll.com" /: "v3/polls")
+          (ReqBodyJson poll)
+          jsonResponse
+          mempty
+      )
