@@ -99,14 +99,12 @@ createPoll = do
     wNum = show $ weekNum (head week)
     title = "Tollas (hét #" <> wNum <> ")"
     poll = mkPoll tz title week defaultHours
+    request =
+      req
+        POST
+        (https "api.strawpoll.com" /: "v3/polls")
+        (ReqBodyJson poll)
+        jsonResponse
+        mempty
 
-  responseBody
-    <$> runReq
-      defaultHttpConfig
-      ( req
-          POST
-          (https "api.strawpoll.com" /: "v3/polls")
-          (ReqBodyJson poll)
-          jsonResponse
-          mempty
-      )
+  responseBody <$> runReq defaultHttpConfig request

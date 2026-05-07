@@ -3,20 +3,18 @@
 module Bot (runBot) where
 
 import Control.Monad (unless, void, when)
+import Control.Monad.IO.Class
 import Data.Text (Text, isPrefixOf, pack, toLower)
 import qualified Data.Text.IO as TIO
 import System.Environment
 import UnliftIO.Concurrent
 
-import Control.Monad.IO.Class
 import Discord
 import qualified Discord.Requests as R
 import Discord.Types
+
+import Command
 import qualified Poll as P
-
-import Control.Monad
-
-data Command = CreatePoll
 
 runBot :: IO ()
 runBot = do
@@ -51,13 +49,10 @@ handleMessage :: Message -> DiscordHandler ()
 handleMessage msg = unless (fromBot msg) $ do
   let cmd = getCmd (messageContent msg)
   case cmd of
-    Just CreatePoll -> do
+    Right CreatePoll -> do
       P.PollResponse url <- liftIO P.createPoll -- TODO retry if didn't succeed
-      void $ restCall (R.CreateMessage (messageChannelId msg) url)
-    Nothing -> void $ restCall (R.CreateMessage (messageChannelId msg) "Sorry, didn't understand :(")
-
-getCmd :: Text -> Maybe Command
-getCmd msg = Just CreatePoll
+      void $ restCall (R.CreateMessage (messageChannelId msg) url) -- TODO retry this too
+    Left _ -> void $ restCall (R.CreateMessage (messageChannelId msg) "Sorry, didn't understand :(")
 
 fromBot :: Message -> Bool
 fromBot = userIsBot . messageAuthor
