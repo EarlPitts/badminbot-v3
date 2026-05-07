@@ -8,10 +8,20 @@ import Data.Time.Clock as C
 
 import Data.Aeson
 import Data.Text (Text)
+import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import Data.Time.LocalTime
 
-defaultDays = weekAllDays Monday . firstDayOfWeekOnAfter Monday
+nextWeek :: Day -> [Day]
+nextWeek = weekAllDays Monday . firstDayOfWeekOnAfter Monday
+
+weekNum :: Day -> Int
+weekNum d =
+  let (_, week, _) = toWeekDate d
+   in week
+
+defaultDays = nextWeek
+
 defaultHours = [start, start + oneHour .. (end - oneHour)]
  where
   start = 8 * oneHour
@@ -66,10 +76,3 @@ mkEvent :: TimeZone -> Day -> DiffTime -> Event
 mkEvent tz day start = Event (shiftTz start) (shiftTz (start + oneHour))
  where
   shiftTz = localTimeToUTC tz . LocalTime day . timeToTimeOfDay
-
-f = do
-  t <- getCurrentTime
-  tz <- getCurrentTimeZone
-  let d = utctDay t
-  let title = "sajt"
-  pure $ mkEvent tz d <$> defaultHours

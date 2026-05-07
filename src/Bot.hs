@@ -68,9 +68,15 @@ createPoll :: IO ()
 createPoll = do
   d <- utctDay <$> getCurrentTime
   tz <- getCurrentTimeZone
+
+  let
+    week = P.defaultDays d
+    weekNum = show $ P.weekNum (head week)
+    title = "Tollas (hét #" <> weekNum <> ")"
+    poll = P.mkPoll tz title week P.defaultHours
+
   runReq defaultHttpConfig $ do
-    let myData = P.mkPoll tz "testpoll" (P.defaultDays d) P.defaultHours
-    v <- req POST (https "api.strawpoll.com" /: "v3/polls") (ReqBodyJson myData) jsonResponse mempty
+    v <- req POST (https "api.strawpoll.com" /: "v3/polls") (ReqBodyJson poll) jsonResponse mempty
     liftIO $ print (responseBody v :: Value)
 
 getCmd :: Text -> Maybe Command
