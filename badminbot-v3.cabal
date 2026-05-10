@@ -10,28 +10,31 @@ common warnings
   ghc-options: -Wall
 
 library
-  import:           warnings
-  ghc-options:      -O1
+  import:             warnings
+  ghc-options:        -O1
   exposed-modules:
     Bot
-    Poll
     Command
+    Poll
+    ScheduleJob
 
   build-depends:
-    , base             ^>=4.18.2.1
-    , discord-haskell
-    , text
-    , unliftio
     , aeson
-    , req
-    , modern-uri
+    , async
+    , base             ^>=4.18.2.1
     , bytestring
-    , time
+    , discord-haskell
+    , modern-uri
     , parsec
     , random
+    , req
+    , text
+    , time
+    , unliftio
 
-  hs-source-dirs:   src
-  default-language: Haskell2010
+  default-extensions: RecordWildCards
+  hs-source-dirs:     src
+  default-language:   Haskell2010
 
 executable badminbot-v3
   import:           warnings

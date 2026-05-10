@@ -3,10 +3,12 @@
 
 module Bot (runBot) where
 
+import Control.Monad
 import Control.Monad (unless, void, when)
 import Control.Monad.IO.Class
 import Data.Text (Text, isPrefixOf, lines, pack, toLower)
 import qualified Data.Text.IO as TIO
+import Data.Time
 import System.Environment
 import System.Random (randomRIO)
 import UnliftIO.Concurrent
@@ -17,7 +19,9 @@ import qualified Discord.Requests as R
 import Discord.Types
 
 import Command
+import Control.Concurrent.Async
 import qualified Poll as P
+import ScheduleJob
 
 data Env = Env
   { -- config :: Config
@@ -52,6 +56,9 @@ badminbot token = do
 
 -- userFacingError is an unrecoverable error
 -- put normal 'cleanup' code in discordOnEnd (see examples)
+
+-- schedulePoll :: IO (Async ())
+schedulePoll = schedule $ Job (DayTime Thursday (TimeOfDay 9 0 0)) _
 
 eventHandler :: Env -> Event -> DiscordHandler ()
 eventHandler env event = case event of
