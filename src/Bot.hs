@@ -20,6 +20,8 @@ import Discord.Types
 
 import Command
 import Control.Concurrent.Async
+import Data.Foldable (traverse_)
+import Data.Word
 import qualified Poll as P
 import ScheduleJob
 
@@ -38,17 +40,21 @@ data Env = Env
 runBot :: IO ()
 runBot = do
   token <- pack <$> getEnv "TOKEN"
-  badminbot token
+  channelId <- read <$> getEnv "CHAN_ID"
+  let pollTimes = [DayTime Thursday (TimeOfDay 11 0 0)]
+  badminbot token channelId pollTimes
 
-badminbot :: Text -> IO ()
-badminbot token = do
+badminbot :: Text -> Word64 -> [DayTime] -> IO ()
+badminbot token chanIdWord pollTimes = do
   putStrLn "started..."
   js <- lines <$> TIO.readFile "jokes.txt"
   let env = Env js
+  let channelId = DiscordId (Snowflake chanIdWord)
   userFacingError <-
     runDiscord $
       def
         { discordToken = "Bot " <> token
+        , discordOnStart = schedulePolls channelId pollTimes
         , discordOnEvent = eventHandler env
         , discordOnLog = \s -> TIO.putStrLn s >> TIO.putStrLn ""
         }
@@ -57,8 +63,11 @@ badminbot token = do
 -- userFacingError is an unrecoverable error
 -- put normal 'cleanup' code in discordOnEnd (see examples)
 
--- schedulePoll :: IO (Async ())
-schedulePoll = schedule $ Job (DayTime Thursday (TimeOfDay 9 0 0)) _
+schedulePolls :: ChannelId -> [DayTime] -> DiscordHandler ()
+schedulePolls channelId =
+  traverse_ $ \time -> schedule $ Job time $ do
+    P.PollResponse url <- liftIO P.createPoll
+    void $ restCall (R.CreateMessage channelId url)
 
 eventHandler :: Env -> Event -> DiscordHandler ()
 eventHandler env event = case event of

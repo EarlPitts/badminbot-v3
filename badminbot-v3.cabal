@@ -31,6 +31,7 @@ library
     , text
     , time
     , unliftio
+    , mtl
 
   default-extensions: RecordWildCards
   hs-source-dirs:     src
