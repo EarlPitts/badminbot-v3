@@ -20,14 +20,14 @@ data Job = Job
   , action :: DiscordHandler ()
   }
 
-schedule :: Job -> DiscordHandler (Async ())
-schedule Job{..} = do
+schedule :: TimeZone -> IO UTCTime -> Job -> DiscordHandler (Async ())
+schedule tz getTime Job{..} = do
   handle <- ask
   liftIO $ async $ forever $ do
-    now <- getCurrentTime
-    tz <- getCurrentTimeZone
+    now <- getTime
     let delay = getDelay tz now time
     when (delay > 0) $ do
+      putStrLn $ "scheduled poll after " <> show delay <> " seconds"
       -- TODO add log for scheduled job
       threadDelay (floor (delay * 1_000_000))
       runReaderT action handle

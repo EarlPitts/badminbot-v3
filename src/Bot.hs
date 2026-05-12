@@ -20,6 +20,7 @@ import Discord.Types
 
 import Command
 import Control.Concurrent.Async
+import Control.Monad.Reader
 import Data.Foldable (traverse_)
 import Data.Word
 import qualified Poll as P
@@ -28,6 +29,10 @@ import ScheduleJob
 data Env = Env
   { -- config :: Config
     jokes :: [Text]
+  , timeZone :: TimeZone
+  , token :: Text
+  , chanId :: ChannelId
+  , pollTimes :: [DayTime]
   }
   deriving (Show)
 
@@ -37,37 +42,41 @@ data Env = Env
 --   }
 --   deriving (Show)
 
+type App = ReaderT Env IO
+
 runBot :: IO ()
 runBot = do
+  jokes <- lines <$> TIO.readFile "jokes.txt"
+  timeZone <- getCurrentTimeZone
   token <- pack <$> getEnv "TOKEN"
-  channelId <- read <$> getEnv "CHAN_ID"
+  chanId <- DiscordId . Snowflake . read <$> getEnv "CHAN_ID"
   let pollTimes = [DayTime Thursday (TimeOfDay 11 0 0)]
-  badminbot token channelId pollTimes
+  runReaderT badminbot Env{..}
 
-badminbot :: Text -> Word64 -> [DayTime] -> IO ()
-badminbot token chanIdWord pollTimes = do
-  putStrLn "started..."
-  js <- lines <$> TIO.readFile "jokes.txt"
-  let env = Env js
-  let channelId = DiscordId (Snowflake chanIdWord)
+badminbot :: App ()
+badminbot = do
+  liftIO $ putStrLn "started..."
+  env <- ask
   userFacingError <-
-    runDiscord $
-      def
-        { discordToken = "Bot " <> token
-        , discordOnStart = schedulePolls channelId pollTimes
-        , discordOnEvent = eventHandler env
-        , discordOnLog = \s -> TIO.putStrLn s >> TIO.putStrLn ""
-        }
-  TIO.putStrLn userFacingError
+    liftIO $
+      runDiscord $
+        def
+          { discordToken = "Bot " <> env.token
+          , discordOnStart = schedulePolls env env.pollTimes
+          , discordOnEvent = eventHandler env
+          , discordOnLog = \s -> TIO.putStrLn s >> TIO.putStrLn ""
+          }
+  liftIO $ TIO.putStrLn userFacingError
 
 -- userFacingError is an unrecoverable error
 -- put normal 'cleanup' code in discordOnEnd (see examples)
 
-schedulePolls :: ChannelId -> [DayTime] -> DiscordHandler ()
-schedulePolls channelId =
-  traverse_ $ \time -> schedule $ Job time $ do
-    P.PollResponse url <- liftIO P.createPoll
-    void $ restCall (R.CreateMessage channelId url)
+schedulePolls :: Env -> [DayTime] -> DiscordHandler ()
+schedulePolls env =
+  traverse_ $ \time ->
+    schedule env.timeZone getCurrentTime $ Job time $ do
+      P.PollResponse url <- liftIO P.createPoll
+      void $ restCall (R.CreateMessage env.chanId url)
 
 eventHandler :: Env -> Event -> DiscordHandler ()
 eventHandler env event = case event of
