@@ -30,6 +30,14 @@ jobs:
       - name: Update cabal
         run: cabal update
 
+      - name: Configure static build
+        run: |
+          cat >> cabal.project.local <<EOF
+          library-vanilla: True
+          shared: False
+          executable-dynamic: False
+          EOF
+
       - name: Run tests
         run: cabal test
 
