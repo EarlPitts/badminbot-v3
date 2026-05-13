@@ -45,8 +45,8 @@ jobs:
           make_latest: true
           files: dist-newstyle/**/build/**/badminbot-v3
 
-      # - name: Notify server
-      #   if: success()
-      #   run: |
-      #     curl -sf -X POST https://deploy.yourserver.com/hooks/deploy-badminbot \
-      #       -H "X-Deploy-Token: ${{ secrets.DEPLOY_TOKEN }}"
+      - name: Notify server
+        if: success()
+        run: |
+          curl -sf -X POST https://home.bendeguz.xyz:33672/hooks/deploy-badminbot \
+            -H "X-Deploy-Token: ${{ secrets.DEPLOY_TOKEN }}"
