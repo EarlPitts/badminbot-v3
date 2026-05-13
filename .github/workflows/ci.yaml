@@ -34,7 +34,7 @@ jobs:
         run: cabal test
 
       - name: Build executable
-        run: cabal build
+        run: cabal build --ghc-options='-optl-static -optl-pthread'
 
       - name: Publish release
         if: github.ref == 'refs/heads/master'
