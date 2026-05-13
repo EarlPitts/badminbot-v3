@@ -30,3 +30,19 @@ jobs:
 
       - name: Run tests
         run: cabal test
+
+      - name: Build executable
+        run: cabal build
+
+      - name: Publish release
+        if: github.ref == 'refs/heads/master'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          files: dist-newstyle/**/build/**/badminbot
+
+      # - name: Notify server
+      #   if: success()
+      #   run: |
+      #     curl -sf -X POST https://deploy.yourserver.com/hooks/deploy-badminbot \
+      #       -H "X-Deploy-Token: ${{ secrets.DEPLOY_TOKEN }}"
