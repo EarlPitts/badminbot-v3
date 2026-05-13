@@ -47,6 +47,4 @@ jobs:
 
       - name: Notify server
         if: success()
-        run: |
-          curl -sf -X POST https://home.bendeguz.xyz:33672/hooks/deploy-badminbot \
-            -H "X-Deploy-Token: ${{ secrets.DEPLOY_TOKEN }}"
+        run: curl -sf -X POST http://home.bendeguz.xyz:33672/hooks/deploy-badminbot
