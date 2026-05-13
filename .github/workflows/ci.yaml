@@ -39,7 +39,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          files: dist-newstyle/**/build/**/badminbot
+          files: dist-newstyle/**/build/**/badminbot-v3
 
       # - name: Notify server
       #   if: success()
