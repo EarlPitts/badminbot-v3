@@ -25,6 +25,7 @@ import Data.Foldable (traverse_)
 import Data.Word
 import qualified Poll as P
 import ScheduleJob
+import System.IO (hSetBuffering, stdout, BufferMode(LineBuffering))
 
 data Env = Env
   { -- config :: Config
@@ -46,6 +47,7 @@ type App = ReaderT Env IO
 
 runBot :: IO ()
 runBot = do
+  hSetBuffering stdout LineBuffering
   jokes <- lines <$> TIO.readFile "jokes.txt"
   timeZone <- getCurrentTimeZone
   token <- pack <$> getEnv "TOKEN"
