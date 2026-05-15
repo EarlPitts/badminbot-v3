@@ -61,4 +61,4 @@ test-suite badminbot-v3-test
     , badminbot-v3
     , base          ^>=4.18.2.1
     , hspec
-
+    , time
