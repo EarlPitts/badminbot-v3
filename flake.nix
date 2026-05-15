@@ -19,6 +19,9 @@
         haskellPackages = pkgs.haskell.packages.ghc966;
       in
       {
+        packages.default = pkgs.haskell.lib.justStaticExecutables
+          (haskellPackages.callCabal2nix "badminbot" ./. {});
+
         devShells.default = pkgs.mkShell {
           packages = with haskellPackages; [
             ghc

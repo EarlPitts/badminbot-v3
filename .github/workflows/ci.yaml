@@ -8,51 +8,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v5
 
-      - uses: haskell-actions/setup@v2
-        with:
-          ghc-version: '9.6.6'
-          cabal-version: 'latest'
+      - uses: cachix/install-nix-action@v31
 
-      - uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cabal/packages
-            ~/.cabal/store
-            dist-newstyle
-          key: cabal-${{ runner.os }}-${{ hashFiles('**/*.cabal', 'cabal.project') }}
-          restore-keys: cabal-${{ runner.os }}-
-
-      - name: Update cabal
-        run: cabal update
-
-      - name: Configure static build
-        run: |
-          cat >> cabal.project.local <<EOF
-          library-vanilla: True
-          shared: False
-          executable-dynamic: False
-          EOF
-
-      - name: Run tests
-        run: cabal test
-
-      - name: Build executable
-        run: cabal build --ghc-options='-optl-static -optl-pthread -optl-no-pie'
-
-      - name: Publish release
-        if: github.ref == 'refs/heads/master'
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: latest
-          name: Latest Build
-          make_latest: true
-          files: dist-newstyle/**/build/**/badminbot-v3
-
-      - name: Notify server
-        if: success()
-        run: curl -sf -X POST http://home.bendeguz.xyz:33672/hooks/deploy-badminbot
+      - run: nix build
