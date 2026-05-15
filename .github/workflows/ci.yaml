@@ -13,4 +13,15 @@ jobs:
 
       - uses: cachix/install-nix-action@v31
 
-      - run: nix build
+      - name: Build derivation
+        run: nix build
+
+      - name: Setup SSH key
+        run: |
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ${{ runner.temp }}/deploy_key
+          chmod 600 ${{ runner.temp }}/deploy_key
+
+      - name: Copy to server
+        env:
+          NIX_SSHOPTS: "-i ${{ runner.temp }}/deploy_key -p3632 -o StrictHostKeyChecking=no"
+        run: nix copy --to ssh://deploy@home.bendeguz.xyz ./result
