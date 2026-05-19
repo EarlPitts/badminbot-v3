@@ -14,6 +14,7 @@ import Data.Time.LocalTime
 
 import Control.Monad.IO.Class
 import Network.HTTP.Req
+import Data.Text.Encoding (encodeUtf8)
 
 nextWeek :: Day -> [Day]
 nextWeek = weekAllDays Monday . firstDayOfWeekOnAfter Monday
@@ -89,8 +90,8 @@ instance FromJSON PollResponse where
   parseJSON = withObject "PollResponse" $ \obj ->
     PollResponse <$> obj .: "url"
 
-createPoll :: IO PollResponse
-createPoll = do
+createPoll :: Text -> IO PollResponse
+createPoll token = do
   d <- utctDay <$> getCurrentTime
   tz <- getCurrentTimeZone
 
@@ -105,6 +106,6 @@ createPoll = do
         (https "api.strawpoll.com" /: "v3/polls")
         (ReqBodyJson poll)
         jsonResponse
-        mempty
+        (header "X-API-Key" (encodeUtf8 token))
 
   responseBody <$> runReq defaultHttpConfig request

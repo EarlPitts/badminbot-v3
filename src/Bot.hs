@@ -34,6 +34,7 @@ data Env = Env
   , token :: Text
   , chanId :: ChannelId
   , pollTimes :: [DayTime]
+  , strawPollToken :: Text
   }
   deriving (Show)
 
@@ -52,6 +53,7 @@ runBot = do
   timeZone <- getCurrentTimeZone
   token <- pack <$> getEnv "TOKEN"
   chanId <- DiscordId . Snowflake . read <$> getEnv "CHAN_ID"
+  strawPollToken <- pack <$> getEnv "STRAWPOLL_TOKEN"
   let pollTimes = [DayTime Thursday (TimeOfDay 11 0 0)]
   runReaderT badminbot Env{..}
 
@@ -64,7 +66,7 @@ badminbot = do
       runDiscord $
         def
           { discordToken = "Bot " <> env.token
-          , discordOnStart = schedulePolls env env.pollTimes
+          , discordOnStart = schedulePolls env
           , discordOnEvent = eventHandler env
           , discordOnLog = \s -> TIO.putStrLn s >> TIO.putStrLn ""
           }
@@ -73,12 +75,12 @@ badminbot = do
 -- userFacingError is an unrecoverable error
 -- put normal 'cleanup' code in discordOnEnd (see examples)
 
-schedulePolls :: Env -> [DayTime] -> DiscordHandler ()
-schedulePolls env pollTimes = do
+schedulePolls :: Env -> DiscordHandler ()
+schedulePolls env = do
   handle <- ask
-  liftIO $ for_ pollTimes $ \time ->
+  liftIO $ for_ env.pollTimes $ \time ->
     schedule env.timeZone getCurrentTime $ Job time $ do
-      P.PollResponse url <- P.createPoll
+      P.PollResponse url <- P.createPoll env.strawPollToken
       void $ runReaderT (restCall (R.CreateMessage env.chanId url)) handle
 
 eventHandler :: Env -> Event -> DiscordHandler ()
@@ -94,13 +96,13 @@ handleMessage :: Env -> Message -> DiscordHandler ()
 handleMessage Env{..} msg = unless (fromBot msg) $ do
   let cmd = getCmd (messageContent msg)
   case cmd of
-    Right CreatePoll -> createPoll msg
+    Right CreatePoll -> createPoll strawPollToken msg
     Right TellJoke -> tellJoke jokes msg
     Left _ -> unknown msg
 
-createPoll :: Message -> DiscordHandler ()
-createPoll msg = do
-  P.PollResponse url <- liftIO P.createPoll -- TODO retry if didn't succeed
+createPoll :: Text -> Message -> DiscordHandler ()
+createPoll token msg = do
+  P.PollResponse url <- liftIO $ P.createPoll token -- TODO retry if didn't succeed
   void $ restCall (R.CreateMessage (messageChannelId msg) url) -- TODO retry this too
 
 tellJoke :: [Text] -> Message -> DiscordHandler ()
