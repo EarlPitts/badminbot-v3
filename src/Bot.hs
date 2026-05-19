@@ -1,15 +1,18 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Bot (runBot) where
 
-import Control.Monad
 import Control.Monad (unless, void, when)
 import Control.Monad.IO.Class
 import Data.Text (Text, isPrefixOf, lines, pack, toLower)
 import qualified Data.Text.IO as TIO
 import Data.Time
+import GHC.Generics (Generic)
 import System.Environment
+import System.IO (BufferMode (LineBuffering), hSetBuffering, stdout)
 import System.Random (randomRIO)
 import UnliftIO.Concurrent
 import Prelude hiding (lines)
@@ -21,15 +24,16 @@ import Discord.Types
 import Command
 import Control.Concurrent.Async
 import Control.Monad.Reader
+import Data.Aeson
+import qualified Data.ByteString.Lazy as BS
 import Data.Foldable (for_, traverse_)
 import Data.Word
 import qualified Poll as P
 import ScheduleJob
-import System.IO (BufferMode (LineBuffering), hSetBuffering, stdout)
 
 data Env = Env
-  { -- config :: Config
-    jokes :: [Text]
+  { config :: Config
+  , jokes :: [Text]
   , timeZone :: TimeZone
   , token :: Text
   , chanId :: ChannelId
@@ -38,11 +42,11 @@ data Env = Env
   }
   deriving (Show)
 
--- data Config = Config
---   { days :: [Int]
---   , slots :: [Int]
---   }
---   deriving (Show)
+data Config = Config
+  { days :: [Int]
+  , slots :: [Int]
+  }
+  deriving (Show, FromJSON, Generic)
 
 type App = ReaderT Env IO
 
@@ -54,6 +58,7 @@ runBot = do
   token <- pack <$> getEnv "TOKEN"
   chanId <- DiscordId . Snowflake . read <$> getEnv "CHAN_ID"
   strawPollToken <- pack <$> getEnv "STRAWPOLL_TOKEN"
+  config <- throwDecode =<< BS.readFile "config.json"
   let pollTimes = [DayTime Thursday (TimeOfDay 11 0 0)]
   runReaderT badminbot Env{..}
 
