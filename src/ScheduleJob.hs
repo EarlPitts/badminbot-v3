@@ -7,7 +7,6 @@ import Control.Concurrent.Async
 import Control.Monad
 import Control.Monad.Reader
 import Data.Time
-import Discord
 
 data DayTime = DayTime
   { dayOfWeek :: DayOfWeek
@@ -17,12 +16,11 @@ data DayTime = DayTime
 
 data Job = Job
   { time :: DayTime
-  , action :: DiscordHandler ()
+  , action :: IO ()
   }
 
-schedule :: TimeZone -> IO UTCTime -> Job -> DiscordHandler (Async ())
+schedule :: TimeZone -> IO UTCTime -> Job -> IO (Async ())
 schedule tz getTime Job{..} = do
-  handle <- ask
   liftIO $ async $ forever $ do
     now <- getTime
     let delay = getDelay tz now time
@@ -30,7 +28,7 @@ schedule tz getTime Job{..} = do
       putStrLn $ "scheduled poll after " <> show delay <> " seconds"
       -- TODO add log for scheduled job
       threadDelay (floor (delay * 1_000_000))
-      runReaderT action handle
+      action
 
 getDelay :: TimeZone -> UTCTime -> DayTime -> NominalDiffTime
 getDelay tz now DayTime{..} = diffUTCTime nextJob now

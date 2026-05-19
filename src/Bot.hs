@@ -21,11 +21,11 @@ import Discord.Types
 import Command
 import Control.Concurrent.Async
 import Control.Monad.Reader
-import Data.Foldable (traverse_)
+import Data.Foldable (for_, traverse_)
 import Data.Word
 import qualified Poll as P
 import ScheduleJob
-import System.IO (hSetBuffering, stdout, BufferMode(LineBuffering))
+import System.IO (BufferMode (LineBuffering), hSetBuffering, stdout)
 
 data Env = Env
   { -- config :: Config
@@ -74,11 +74,12 @@ badminbot = do
 -- put normal 'cleanup' code in discordOnEnd (see examples)
 
 schedulePolls :: Env -> [DayTime] -> DiscordHandler ()
-schedulePolls env =
-  traverse_ $ \time ->
+schedulePolls env pollTimes = do
+  handle <- ask
+  liftIO $ for_ pollTimes $ \time ->
     schedule env.timeZone getCurrentTime $ Job time $ do
-      P.PollResponse url <- liftIO P.createPoll
-      void $ restCall (R.CreateMessage env.chanId url)
+      P.PollResponse url <- P.createPoll
+      void $ runReaderT (restCall (R.CreateMessage env.chanId url)) handle
 
 eventHandler :: Env -> Event -> DiscordHandler ()
 eventHandler env event = case event of
