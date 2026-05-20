@@ -1,38 +1,36 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Poll where
 
-import Data.Time.Calendar
-import Data.Time.Clock as C
-
+import Control.Monad.IO.Class
 import Data.Aeson
 import Data.Text (Text)
+import Data.Text.Encoding (encodeUtf8)
+import Data.Time.Calendar
 import Data.Time.Calendar.WeekDate (toWeekDate)
+import Data.Time.Clock as C
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import Data.Time.LocalTime
-
-import Control.Monad.IO.Class
+import GHC.Generics (Generic)
 import Network.HTTP.Req
-import Data.Text.Encoding (encodeUtf8)
 
-nextWeek :: Day -> [Day]
-nextWeek = weekAllDays Monday . firstDayOfWeekOnAfter Monday
+data Config = Config
+  { days :: [Int]
+  , slots :: [Int]
+  }
+  deriving (Show, FromJSON, Generic)
 
-weekNum :: Day -> Int
-weekNum d =
-  let (_, week, _) = toWeekDate d
-   in week
+newtype PollResponse = PollResponse
+  { url :: Text
+  }
+  deriving (Show)
 
-defaultDays = nextWeek
-
-defaultHours = [start, start + oneHour .. (end - oneHour)]
- where
-  start = 8 * oneHour
-  end = 22 * oneHour
-
-oneHour :: DiffTime
-oneHour = 3600
+instance FromJSON PollResponse where
+  parseJSON = withObject "PollResponse" $ \obj ->
+    PollResponse <$> obj .: "url"
 
 data Poll = Poll
   { title :: String
@@ -71,6 +69,37 @@ instance ToJSON Event where
       , "type" .= ("time_range" :: Text)
       ]
 
+defaultDays = nextWeek
+defaultSlots = mkSlots 8 22
+
+mkSlots :: DiffTime -> DiffTime -> [DiffTime]
+mkSlots startNum endNum = [start, start + oneHour .. (end - oneHour)]
+ where
+  start = startNum * oneHour
+  end = endNum * oneHour
+
+nextWeek :: Day -> [Day]
+nextWeek = weekAllDays Monday . firstDayOfWeekOnAfter Monday
+
+weekNum :: Day -> Int
+weekNum d =
+  let (_, week, _) = toWeekDate d
+   in week
+
+oneHour :: DiffTime
+oneHour = 3600
+
+getDays :: Maybe Config -> Day -> [Day]
+getDays Nothing d = defaultDays d
+getDays (Just (Config dayIdxs _)) d =
+  snd <$> filter (\(i, _) -> i `elem` dayIdxs) (zip [0 ..] (nextWeek d))
+
+getSlots :: Maybe Config -> [DiffTime]
+getSlots Nothing = defaultSlots
+getSlots (Just (Config _ boundaries)) = mkSlots start finish
+ where
+  [start, finish] = secondsToDiffTime . fromIntegral <$> boundaries
+
 mkPoll :: TimeZone -> String -> [Day] -> [DiffTime] -> Poll
 mkPoll tz title days hours = Poll{..}
  where
@@ -81,25 +110,17 @@ mkEvent tz day start = Event (shiftTz start) (shiftTz (start + oneHour))
  where
   shiftTz = localTimeToUTC tz . LocalTime day . timeToTimeOfDay
 
-newtype PollResponse = PollResponse
-  { url :: Text
-  }
-  deriving (Show)
-
-instance FromJSON PollResponse where
-  parseJSON = withObject "PollResponse" $ \obj ->
-    PollResponse <$> obj .: "url"
-
-createPoll :: Text -> IO PollResponse
-createPoll token = do
+createPoll :: Maybe Config -> Text -> IO PollResponse
+createPoll maybeConfig token = do
   d <- utctDay <$> getCurrentTime
   tz <- getCurrentTimeZone
 
   let
-    week = defaultDays d
+    week = getDays maybeConfig d
+    slots = getSlots maybeConfig
     wNum = show $ weekNum (head week)
     title = "Tollas (hét #" <> wNum <> ")"
-    poll = mkPoll tz title week defaultHours
+    poll = mkPoll tz title week slots
     request =
       req
         POST
