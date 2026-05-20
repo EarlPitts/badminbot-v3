@@ -17,7 +17,7 @@ import System.Directory (doesFileExist)
 import System.Environment
 import System.IO (BufferMode (LineBuffering), hSetBuffering, stdout)
 import System.Random (randomRIO)
-import Prelude hiding (lines)
+import Prelude hiding (lines, log)
 
 import Discord
 import qualified Discord.Requests as R
@@ -51,7 +51,7 @@ runBot = do
   token <- pack <$> getEnv "TOKEN"
   chanId <- DiscordId . Snowflake . read <$> getEnv "CHAN_ID"
   strawPollToken <- pack <$> getEnv "STRAWPOLL_TOKEN"
-  config <- readConfig configPath
+  config <- log "Read config" (readConfig configPath)
   let pollTimes = [DayTime Thursday (TimeOfDay 11 0 0)]
   runReaderT badminbot Env{..}
 
@@ -72,6 +72,12 @@ badminbot = do
 
 -- userFacingError is an unrecoverable error
 -- put normal 'cleanup' code in discordOnEnd (see examples)
+
+log :: (Show a) => String -> IO a -> IO a
+log msg f = do
+  res <- f
+  putStrLn $ msg <> ": " <> show res
+  pure res
 
 readConfig :: String -> IO (Maybe P.Config)
 readConfig path = do
