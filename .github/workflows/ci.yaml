@@ -30,4 +30,4 @@ jobs:
         env:
           SSHOPTS: "-i ${{ runner.temp }}/deploy_key -p3632 -o StrictHostKeyChecking=no"
         run: ssh $SSHOPTS deploy@home.bendeguz.xyz \
-          "ln -sfn $(nix path-info ./result)/bin/badminbot-v3 /srv/badminbot/ && sudo systemctl restart badminbotV3"
+          "ln -sfn $(nix path-info ./result)/bin/badminbot-v3 /srv/badminbot/ && sudo systemctl restart badminbot"
