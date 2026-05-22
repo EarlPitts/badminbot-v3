@@ -51,7 +51,7 @@ runBot = do
   token <- pack <$> getEnv "TOKEN"
   chanId <- DiscordId . Snowflake . read <$> getEnv "CHAN_ID"
   strawPollToken <- pack <$> getEnv "STRAWPOLL_TOKEN"
-  config <- log "Read config" (readConfig configPath)
+  config <- withLog "Read config" (readConfig configPath)
   let pollTimes = [DayTime Thursday (TimeOfDay 11 0 0)]
   runReaderT badminbot Env{..}
 
@@ -73,8 +73,8 @@ badminbot = do
 -- userFacingError is an unrecoverable error
 -- put normal 'cleanup' code in discordOnEnd (see examples)
 
-log :: (Show a) => String -> IO a -> IO a
-log msg f = do
+withLog :: (Show a) => String -> IO a -> IO a
+withLog msg f = do
   res <- f
   putStrLn $ msg <> ": " <> show res
   pure res
@@ -109,7 +109,8 @@ handleMessage Env{..} msg = unless (fromBot msg) $ do
   case cmd of
     Right CreatePoll -> createPoll config strawPollToken msg
     Right TellJoke -> tellJoke jokes msg
-    Left _ -> unknown msg
+    Right UnknownCommand -> unknown msg
+    Left _ -> pure ()
 
 createPoll :: Maybe P.Config -> Text -> Message -> DiscordHandler ()
 createPoll config token msg = do
