@@ -15,6 +15,7 @@ import qualified Data.Text.IO as TIO
 import Data.Time
 import System.Directory (doesFileExist)
 import System.Environment
+import System.Exit (exitFailure)
 import System.IO (BufferMode (LineBuffering), hSetBuffering, stdout)
 import System.Random (randomRIO)
 import Prelude hiding (lines, log)
@@ -69,6 +70,7 @@ badminbot = do
           , discordOnLog = \s -> TIO.putStrLn s >> TIO.putStrLn ""
           }
   liftIO $ TIO.putStrLn userFacingError
+  liftIO exitFailure
 
 -- userFacingError is an unrecoverable error
 -- put normal 'cleanup' code in discordOnEnd (see examples)
