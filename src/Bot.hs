@@ -23,11 +23,12 @@ import Discord
 import qualified Discord.Requests as R
 import Discord.Types
 
+import Control.Applicative
 import qualified Poll as P
 import ScheduleJob
 
 data Env = Env
-  { config :: Maybe P.Config
+  { config :: P.Config
   , jokes :: [Text]
   , timeZone :: TimeZone
   , token :: Text
@@ -53,7 +54,9 @@ runBot = do
   chanId <- DiscordId . Snowflake . read <$> getEnv "CHAN_ID"
   adminId <- DiscordId . Snowflake . read <$> getEnv "ADMIN"
   strawPollToken <- pack <$> getEnv "STRAWPOLL_TOKEN"
-  config <- withLog "Read config" (readConfig configPath)
+  config <-
+    withLog "Read config" (readConfig configPath)
+      <|> withLog "Using default config" (pure P.defaultConfig)
   let pollPublishTime = DayTime Thursday (TimeOfDay 11 0 0)
   runReaderT badminbot Env{..}
 
@@ -82,12 +85,8 @@ withLog msg f = do
   putStrLn $ msg <> ": " <> show res
   pure res
 
-readConfig :: String -> IO (Maybe P.Config)
-readConfig path = do
-  exists <- doesFileExist path
-  if exists
-    then throwDecode =<< BS.readFile path
-    else pure Nothing
+readConfig :: String -> IO P.Config
+readConfig path = BS.readFile path >>= throwDecode
 
 schedulePolls :: Env -> DiscordHandler ()
 schedulePolls env = do
@@ -117,7 +116,7 @@ handleMessage Env{..} msg = unless (fromBot msg) $ do
     Right UnknownCommand -> unknown msg
     Left _ -> pure ()
 
-createPoll :: Maybe P.Config -> Text -> Message -> DiscordHandler ()
+createPoll :: P.Config -> Text -> Message -> DiscordHandler ()
 createPoll config token msg = do
   P.PollResponse url <- liftIO $ P.createPoll config token -- TODO retry if didn't succeed
   void $ restCall (R.CreateMessage (messageChannelId msg) url) -- TODO retry this too

@@ -5,7 +5,6 @@
 
 module Poll where
 
-import Control.Monad.IO.Class
 import Data.Aeson
 import Data.Text (Text)
 import Data.Text.Encoding (encodeUtf8)
@@ -69,8 +68,8 @@ instance ToJSON Event where
       , "type" .= ("time_range" :: Text)
       ]
 
-defaultDays = nextWeek
-defaultSlots = mkSlots 8 22
+defaultConfig :: Config
+defaultConfig = Config [0 .. 6] [8, 22]
 
 mkSlots :: DiffTime -> DiffTime -> [DiffTime]
 mkSlots startNum endNum = [start, start + oneHour .. (end - oneHour)]
@@ -89,14 +88,12 @@ weekNum d =
 oneHour :: DiffTime
 oneHour = 3600
 
-getDays :: Maybe Config -> Day -> [Day]
-getDays Nothing d = defaultDays d
-getDays (Just (Config dayIdxs _)) d =
+getDays :: Config -> Day -> [Day]
+getDays (Config dayIdxs _) d =
   snd <$> filter (\(i, _) -> i `elem` dayIdxs) (zip [0 ..] (nextWeek d))
 
-getSlots :: Maybe Config -> [DiffTime]
-getSlots Nothing = defaultSlots
-getSlots (Just (Config _ boundaries)) = mkSlots start finish
+getSlots :: Config -> [DiffTime]
+getSlots (Config _ boundaries) = mkSlots start finish
  where
   [start, finish] = secondsToDiffTime . fromIntegral <$> boundaries
 
@@ -110,14 +107,14 @@ mkEvent tz day start = Event (shiftTz start) (shiftTz (start + oneHour))
  where
   shiftTz = localTimeToUTC tz . LocalTime day . timeToTimeOfDay
 
-createPoll :: Maybe Config -> Text -> IO PollResponse
-createPoll maybeConfig token = do
+createPoll :: Config -> Text -> IO PollResponse
+createPoll config token = do
   d <- utctDay <$> getCurrentTime
   tz <- getCurrentTimeZone
 
   let
-    week = getDays maybeConfig d
-    slots = getSlots maybeConfig
+    week = getDays config d
+    slots = getSlots config
     wNum = show $ weekNum (head week)
     title = "Tollas (hét #" <> wNum <> ")"
     poll = mkPoll tz title week slots
