@@ -34,7 +34,7 @@ data Env = Env
   , token :: Text
   , chanId :: ChannelId
   , adminId :: UserId
-  , pollPublishTime :: [DayTime]
+  , pollPublishTime :: DayTime
   , strawPollToken :: Text
   }
   deriving (Show)
@@ -55,7 +55,7 @@ runBot = do
   adminId <- DiscordId . Snowflake . read <$> getEnv "ADMIN"
   strawPollToken <- pack <$> getEnv "STRAWPOLL_TOKEN"
   config <- withLog "Read config" (readConfig configPath)
-  let pollPublishTime = [DayTime Thursday (TimeOfDay 11 0 0)]
+  let pollPublishTime = DayTime Thursday (TimeOfDay 11 0 0)
   runReaderT badminbot Env{..}
 
 badminbot :: App ()
@@ -93,10 +93,9 @@ readConfig path = do
 schedulePolls :: Env -> DiscordHandler ()
 schedulePolls env = do
   handle <- ask
-  liftIO $ for_ env.pollPublishTime $ \time ->
-    schedule env.timeZone getCurrentTime $ Job time $ do
-      P.PollResponse url <- P.createPoll env.config env.strawPollToken
-      void $ runReaderT (restCall (R.CreateMessage env.chanId url)) handle
+  liftIO $ void $ schedule env.timeZone getCurrentTime $ Job env.pollPublishTime $ do
+    P.PollResponse url <- P.createPoll env.config env.strawPollToken
+    void $ runReaderT (restCall (R.CreateMessage env.chanId url)) handle
 
 eventHandler :: Env -> Event -> DiscordHandler ()
 eventHandler env event = case event of
