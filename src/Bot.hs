@@ -16,7 +16,9 @@ import System.Environment
 import System.Exit (exitFailure)
 import System.IO (BufferMode (LineBuffering), hSetBuffering, stdout)
 import System.Random (randomRIO)
+import Text.Printf (printf)
 import Prelude hiding (lines, log)
+import Debug.Trace
 
 import Discord
 import qualified Discord.Requests as R
@@ -108,12 +110,13 @@ eventHandler env event = case event of
 
 handleMessage :: Env -> Message -> DiscordHandler ()
 handleMessage Env{..} msg = unless (fromBot msg) $ do
-  let cmd = getCmd (messageContent msg)
+  let cmd = traceShowId (getCmd (messageContent msg))
       withAuth = auth adminId msg
   case cmd of
     -- Admin only
     Right CreatePoll -> withAuth $ createPoll configRef strawPollToken chanId
     Right ShutUp -> withAuth $ stopPolls configRef msg
+    Right (ScheduleHours slots) -> withAuth $ scheduleHours configRef slots msg
     -- All users
     Right TellJoke -> tellJoke jokes msg
     Right UnknownCommand -> unknown msg
@@ -131,6 +134,12 @@ stopPolls configRef msg = do
   currConf <- liftIO $ readIORef configRef
   liftIO $ modifyConfig (P.Config [] currConf.slots) configRef
   void $ restCall (R.CreateMessage (messageChannelId msg) "All right, turning off polls.")
+
+scheduleHours :: IORef P.Config -> [Int] -> Message -> DiscordHandler ()
+scheduleHours configRef slots@[from, to] msg = do
+  currConf <- liftIO $ readIORef configRef
+  liftIO $ modifyConfig (P.Config currConf.days slots) configRef
+  void $ restCall (R.CreateMessage (messageChannelId msg) (pack (printf "Timeslots were modified to: %d - %d" from to))) -- TODO refact
 
 modifyConfig :: P.Config -> IORef P.Config -> IO ()
 modifyConfig newConfig configRef = do

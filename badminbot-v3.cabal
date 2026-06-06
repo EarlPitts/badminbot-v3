@@ -7,7 +7,7 @@ author:        Ben
 build-type:    Simple
 
 common warnings
-  ghc-options: -Wall
+  ghc-options: -Wall -Wno-unused-do-bind
 
 library
   import:             warnings
