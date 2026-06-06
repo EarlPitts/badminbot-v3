@@ -4,7 +4,7 @@
 module Bot (runBot) where
 
 import Command
-import Control.Monad (unless, void, when)
+import Control.Monad (guard, unless, void, when)
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Data.Aeson
@@ -12,7 +12,6 @@ import qualified Data.ByteString.Lazy as BS
 import Data.Text (Text, lines, pack)
 import qualified Data.Text.IO as TIO
 import Data.Time
-import System.Directory (doesFileExist)
 import System.Environment
 import System.Exit (exitFailure)
 import System.IO (BufferMode (LineBuffering), hSetBuffering, stdout)
@@ -94,6 +93,7 @@ schedulePolls env = do
   handle <- ask
   liftIO $ void $ schedule env.timeZone getCurrentTime $ Job env.pollPublishTime $ do
     config <- readIORef env.configRef
+    guard (not . null $ config.days)
     P.PollResponse url <- P.createPoll config env.strawPollToken
     void $ runReaderT (restCall (R.CreateMessage env.chanId url)) handle
 
@@ -112,17 +112,30 @@ handleMessage Env{..} msg = unless (fromBot msg) $ do
       withAuth = auth adminId msg
   case cmd of
     -- Admin only
-    Right CreatePoll -> withAuth $ createPoll configRef strawPollToken msg
+    Right CreatePoll -> withAuth $ createPoll configRef strawPollToken chanId
+    Right ShutUp -> withAuth $ stopPolls configRef msg
     -- All users
     Right TellJoke -> tellJoke jokes msg
     Right UnknownCommand -> unknown msg
     Left _ -> pure ()
 
-createPoll :: IORef P.Config -> Text -> Message -> DiscordHandler ()
-createPoll configRef token msg = do
+createPoll :: IORef P.Config -> Text -> ChannelId -> DiscordHandler ()
+createPoll configRef token chanId = do
   config <- liftIO $ readIORef configRef
+  guard (not . null $ config.days)
   P.PollResponse url <- liftIO $ P.createPoll config token -- TODO retry if didn't succeed
-  void $ restCall (R.CreateMessage (messageChannelId msg) url) -- TODO retry this too
+  void $ restCall (R.CreateMessage chanId url) -- TODO retry this too
+
+stopPolls :: IORef P.Config -> Message -> DiscordHandler ()
+stopPolls configRef msg = do
+  currConf <- liftIO $ readIORef configRef
+  liftIO $ modifyConfig (P.Config [] currConf.slots) configRef
+  void $ restCall (R.CreateMessage (messageChannelId msg) "All right, turning off polls.")
+
+modifyConfig :: P.Config -> IORef P.Config -> IO ()
+modifyConfig newConfig configRef = do
+  writeIORef configRef newConfig
+  BS.writeFile configPath (encode newConfig)
 
 tellJoke :: [Text] -> Message -> DiscordHandler ()
 tellJoke jokes msg = do
