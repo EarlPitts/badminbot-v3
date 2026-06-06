@@ -24,11 +24,12 @@ import qualified Discord.Requests as R
 import Discord.Types
 
 import Control.Applicative
+import Data.IORef
 import qualified Poll as P
 import ScheduleJob
 
 data Env = Env
-  { config :: P.Config
+  { configRef :: IORef P.Config
   , jokes :: [Text]
   , timeZone :: TimeZone
   , token :: Text
@@ -37,7 +38,6 @@ data Env = Env
   , pollPublishTime :: DayTime
   , strawPollToken :: Text
   }
-  deriving (Show)
 
 type App = ReaderT Env IO
 
@@ -57,6 +57,7 @@ runBot = do
   config <-
     withLog "Read config" (readConfig configPath)
       <|> withLog "Using default config" (pure P.defaultConfig)
+  configRef <- newIORef config
   let pollPublishTime = DayTime Thursday (TimeOfDay 11 0 0)
   runReaderT badminbot Env{..}
 
@@ -92,7 +93,8 @@ schedulePolls :: Env -> DiscordHandler ()
 schedulePolls env = do
   handle <- ask
   liftIO $ void $ schedule env.timeZone getCurrentTime $ Job env.pollPublishTime $ do
-    P.PollResponse url <- P.createPoll env.config env.strawPollToken
+    config <- readIORef env.configRef
+    P.PollResponse url <- P.createPoll config env.strawPollToken
     void $ runReaderT (restCall (R.CreateMessage env.chanId url)) handle
 
 eventHandler :: Env -> Event -> DiscordHandler ()
@@ -110,14 +112,15 @@ handleMessage Env{..} msg = unless (fromBot msg) $ do
       withAuth = auth adminId msg
   case cmd of
     -- Admin only
-    Right CreatePoll -> withAuth $ createPoll config strawPollToken msg
+    Right CreatePoll -> withAuth $ createPoll configRef strawPollToken msg
     -- All users
     Right TellJoke -> tellJoke jokes msg
     Right UnknownCommand -> unknown msg
     Left _ -> pure ()
 
-createPoll :: P.Config -> Text -> Message -> DiscordHandler ()
-createPoll config token msg = do
+createPoll :: IORef P.Config -> Text -> Message -> DiscordHandler ()
+createPoll configRef token msg = do
+  config <- liftIO $ readIORef configRef
   P.PollResponse url <- liftIO $ P.createPoll config token -- TODO retry if didn't succeed
   void $ restCall (R.CreateMessage (messageChannelId msg) url) -- TODO retry this too
 
