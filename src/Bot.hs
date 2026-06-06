@@ -9,8 +9,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Data.Aeson
 import qualified Data.ByteString.Lazy as BS
-import Data.Foldable (for_)
-import Data.Text (Text, isPrefixOf, lines, pack, toLower)
+import Data.Text (Text, lines, pack)
 import qualified Data.Text.IO as TIO
 import Data.Time
 import System.Directory (doesFileExist)
@@ -139,6 +138,3 @@ fromBot = userIsBot . messageAuthor
 
 fromAdmin :: UserId -> Message -> Bool
 fromAdmin admin = (== admin) . userId . messageAuthor
-
-isPing :: Message -> Bool
-isPing = ("ping" `isPrefixOf`) . toLower . messageContent
