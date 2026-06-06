@@ -12,7 +12,6 @@ import qualified Data.ByteString.Lazy as BS
 import Data.Text (Text, lines, pack)
 import qualified Data.Text.IO as TIO
 import Data.Time
-import Debug.Trace
 import System.Environment
 import System.Exit (exitFailure)
 import System.IO (BufferMode (LineBuffering), hSetBuffering, stdout)
@@ -110,7 +109,7 @@ eventHandler env event = case event of
 
 handleMessage :: Env -> Message -> DiscordHandler ()
 handleMessage Env{..} msg = unless (fromBot msg) $ do
-  let cmd = traceShowId (getCmd (messageContent msg))
+  let cmd = getCmd (messageContent msg)
       withAuth = auth adminId msg
   case cmd of
     -- Admin only
