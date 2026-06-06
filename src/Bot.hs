@@ -12,13 +12,13 @@ import qualified Data.ByteString.Lazy as BS
 import Data.Text (Text, lines, pack)
 import qualified Data.Text.IO as TIO
 import Data.Time
+import Debug.Trace
 import System.Environment
 import System.Exit (exitFailure)
 import System.IO (BufferMode (LineBuffering), hSetBuffering, stdout)
 import System.Random (randomRIO)
 import Text.Printf (printf)
 import Prelude hiding (lines, log)
-import Debug.Trace
 
 import Discord
 import qualified Discord.Requests as R
@@ -133,13 +133,13 @@ stopPolls :: IORef P.Config -> Message -> DiscordHandler ()
 stopPolls configRef msg = do
   currConf <- liftIO $ readIORef configRef
   liftIO $ modifyConfig (P.Config [] currConf.slots) configRef
-  void $ restCall (R.CreateMessage (messageChannelId msg) "All right, turning off polls.")
+  reply msg "All right, turning off polls."
 
 scheduleHours :: IORef P.Config -> [Int] -> Message -> DiscordHandler ()
 scheduleHours configRef slots@[from, to] msg = do
   currConf <- liftIO $ readIORef configRef
   liftIO $ modifyConfig (P.Config currConf.days slots) configRef
-  void $ restCall (R.CreateMessage (messageChannelId msg) (pack (printf "Timeslots were modified to: %d - %d" from to))) -- TODO refact
+  reply msg (pack (printf "Timeslots were modified to: %d - %d" from to))
 
 modifyConfig :: P.Config -> IORef P.Config -> IO ()
 modifyConfig newConfig configRef = do
@@ -149,10 +149,13 @@ modifyConfig newConfig configRef = do
 tellJoke :: [Text] -> Message -> DiscordHandler ()
 tellJoke jokes msg = do
   joke <- (jokes !!) <$> randomRIO (0, length jokes - 1)
-  void $ restCall (R.CreateMessage (messageChannelId msg) joke) -- TODO retry this too
+  reply msg joke -- TODO retry this too
 
 unknown :: Message -> DiscordHandler ()
-unknown msg = void $ restCall (R.CreateMessage (messageChannelId msg) "Sorry, didn't understand :(")
+unknown msg = reply msg "Sorry, didn't understand :("
+
+reply :: Message -> Text -> DiscordHandler ()
+reply msg = void . restCall . R.CreateMessage (messageChannelId msg)
 
 auth :: UserId -> Message -> DiscordHandler () -> DiscordHandler ()
 auth admin msg = when (fromAdmin admin msg)
