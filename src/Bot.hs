@@ -4,7 +4,7 @@
 module Bot (runBot) where
 
 import Command
-import Control.Monad (unless, void)
+import Control.Monad (unless, void, when)
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Data.Aeson
@@ -33,6 +33,7 @@ data Env = Env
   , timeZone :: TimeZone
   , token :: Text
   , chanId :: ChannelId
+  , adminId :: UserId
   , pollTimes :: [DayTime]
   , strawPollToken :: Text
   }
@@ -51,6 +52,7 @@ runBot = do
   timeZone <- getCurrentTimeZone
   token <- pack <$> getEnv "TOKEN"
   chanId <- DiscordId . Snowflake . read <$> getEnv "CHAN_ID"
+  adminId <- DiscordId . Snowflake . read <$> getEnv "ADMIN"
   strawPollToken <- pack <$> getEnv "STRAWPOLL_TOKEN"
   config <- withLog "Read config" (readConfig configPath)
   let pollTimes = [DayTime Thursday (TimeOfDay 11 0 0)]
@@ -108,8 +110,11 @@ eventHandler env event = case event of
 handleMessage :: Env -> Message -> DiscordHandler ()
 handleMessage Env{..} msg = unless (fromBot msg) $ do
   let cmd = getCmd (messageContent msg)
+      withAuth = auth adminId msg
   case cmd of
-    Right CreatePoll -> createPoll config strawPollToken msg
+    -- Admin only
+    Right CreatePoll -> withAuth $ createPoll config strawPollToken msg
+    -- All users
     Right TellJoke -> tellJoke jokes msg
     Right UnknownCommand -> unknown msg
     Left _ -> pure ()
@@ -127,8 +132,14 @@ tellJoke jokes msg = do
 unknown :: Message -> DiscordHandler ()
 unknown msg = void $ restCall (R.CreateMessage (messageChannelId msg) "Sorry, didn't understand :(")
 
+auth :: UserId -> Message -> DiscordHandler () -> DiscordHandler ()
+auth admin msg = when (fromAdmin admin msg)
+
 fromBot :: Message -> Bool
 fromBot = userIsBot . messageAuthor
+
+fromAdmin :: UserId -> Message -> Bool
+fromAdmin admin = (== admin) . userId . messageAuthor
 
 isPing :: Message -> Bool
 isPing = ("ping" `isPrefixOf`) . toLower . messageContent
