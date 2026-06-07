@@ -130,19 +130,18 @@ createPoll configRef token chanId = do
 
 stopPolls :: IORef P.Config -> Message -> DiscordHandler ()
 stopPolls configRef msg = do
-  currConf <- liftIO $ readIORef configRef
-  liftIO $ modifyConfig (P.Config [] currConf.slots) configRef
+  liftIO $ modifyConfig configRef (\currConf -> currConf{P.days = []})
   reply msg "All right, turning off polls."
 
 scheduleHours :: IORef P.Config -> [Int] -> Message -> DiscordHandler ()
 scheduleHours configRef slots@[from, to] msg = do
-  currConf <- liftIO $ readIORef configRef
-  liftIO $ modifyConfig (P.Config currConf.days slots) configRef
+  liftIO $ modifyConfig configRef (\currConf -> currConf{P.slots = slots})
   reply msg (pack (printf "Timeslots were modified to: %d - %d" from to))
 
-modifyConfig :: P.Config -> IORef P.Config -> IO ()
-modifyConfig newConfig configRef = do
-  writeIORef configRef newConfig
+modifyConfig :: IORef P.Config -> (P.Config -> P.Config) -> IO ()
+modifyConfig configRef f = do
+  modifyIORef configRef f
+  newConfig <- readIORef configRef
   BS.writeFile configPath (encode newConfig)
 
 tellJoke :: [Text] -> Message -> DiscordHandler ()
