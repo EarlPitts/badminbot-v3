@@ -13,6 +13,7 @@ data Command
   | ScheduleDays [Int]
   | GetSchedule
   | GetSlots
+  | Call String
   | TellJoke
   | UnknownCommand
   deriving (Show)
@@ -32,6 +33,7 @@ pCommand =
           , pScheduleDays
           , pGetSchedule
           , pGetSlots
+          , pCall
           , pJoke
           , pUnknown
           ]
@@ -67,6 +69,9 @@ pGetSchedule = string "get schedule" $> GetSchedule
 
 pGetSlots :: Parser Command
 pGetSlots = string "get timeslots" $> GetSlots
+
+pCall :: Parser Command
+pCall = fmap Call $ string "call " *> many1 letter
 
 pJoke :: Parser Command
 pJoke = string "joke" $> TellJoke

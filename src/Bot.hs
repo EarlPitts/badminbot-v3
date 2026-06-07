@@ -122,6 +122,7 @@ handleMessage Env{..} msg = unless (fromBot msg) $ do
     Right GetSchedule -> withAuth $ getSchedule configRef msg
     Right GetSlots -> withAuth $ getSlots configRef msg
     -- All users
+    Right (Call target) -> call target msg
     Right TellJoke -> tellJoke jokes msg
     Right UnknownCommand -> unknown msg
     Left _ -> pure ()
@@ -163,6 +164,13 @@ modifyConfig configRef f = do
   modifyIORef configRef f
   newConfig <- readIORef configRef
   BS.writeFile configPath (encode newConfig)
+
+call :: String -> Message -> DiscordHandler ()
+call target msg = do
+  dow <- liftIO (Data.Time.dayOfWeek . utctDay <$> getCurrentTime)
+  if (target == "Tüskecsarnok" || target == "Tüske") && dow < Saturday
+    then reply msg "They said they are full and then condescendingly reprimanded me for calling them in the first place during the working days of the week."
+    else reply msg "Unfortunately, no response..."
 
 tellJoke :: [Text] -> Message -> DiscordHandler ()
 tellJoke jokes msg = do
