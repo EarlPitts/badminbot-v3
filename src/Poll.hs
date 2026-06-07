@@ -88,6 +88,16 @@ weekNum d =
 oneHour :: DiffTime
 oneHour = 3600
 
+showDay :: Int -> String
+showDay 0 = "Monday"
+showDay 1 = "Tuesday"
+showDay 2 = "Wednesday"
+showDay 3 = "Thursday"
+showDay 4 = "Friday"
+showDay 5 = "Saturday"
+showDay 6 = "Sunday"
+showDay _ = ""
+
 getDays :: Config -> Day -> [Day]
 getDays (Config dayIdxs _) d =
   snd <$> filter (\(i, _) -> i `elem` dayIdxs) (zip [0 ..] (nextWeek d))

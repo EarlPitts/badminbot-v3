@@ -1,7 +1,8 @@
 module Command where
 
+import Control.Monad
 import Data.Functor
-import Data.Text
+import Data.Text (Text)
 import Text.Parsec
 import Text.Parsec.Text
 
@@ -9,6 +10,7 @@ data Command
   = CreatePoll
   | ShutUp
   | ScheduleHours [Int]
+  | ScheduleDays [Int]
   | TellJoke
   | UnknownCommand
   deriving (Show)
@@ -25,6 +27,7 @@ pCommand =
           [ pPoll
           , pShutup
           , pScheduleHours
+          , pScheduleDays
           , pJoke
           , pUnknown
           ]
@@ -45,7 +48,15 @@ pScheduleHours = do
   from <- pInt
   space
   to <- pInt
+  guard $ (from > 0) && (to < 24) && (from < to)
   pure $ ScheduleHours [from, to]
+
+pScheduleDays :: Parser Command
+pScheduleDays = do
+  string "schedule"
+  days <- many1 (space *> pInt)
+  guard (all (< 7) days)
+  pure $ ScheduleDays days
 
 pJoke :: Parser Command
 pJoke = string "joke" $> TellJoke

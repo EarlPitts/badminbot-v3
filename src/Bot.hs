@@ -9,7 +9,8 @@ import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Data.Aeson
 import qualified Data.ByteString.Lazy as BS
-import Data.Text (Text, lines, pack)
+import Data.Text (Text)
+import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Data.Time
 import System.Environment
@@ -48,12 +49,12 @@ configPath = "config.json"
 runBot :: IO ()
 runBot = do
   hSetBuffering stdout LineBuffering
-  jokes <- lines <$> TIO.readFile jokesPath
+  jokes <- T.lines <$> TIO.readFile jokesPath
   timeZone <- getCurrentTimeZone
-  token <- pack <$> getEnv "TOKEN"
+  token <- T.pack <$> getEnv "TOKEN"
   chanId <- DiscordId . Snowflake . read <$> getEnv "CHAN_ID"
   adminId <- DiscordId . Snowflake . read <$> getEnv "ADMIN"
-  strawPollToken <- pack <$> getEnv "STRAWPOLL_TOKEN"
+  strawPollToken <- T.pack <$> getEnv "STRAWPOLL_TOKEN"
   config <-
     withLog "Read config" (readConfig configPath)
       <|> withLog "Using default config" (pure P.defaultConfig)
@@ -111,11 +112,13 @@ handleMessage :: Env -> Message -> DiscordHandler ()
 handleMessage Env{..} msg = unless (fromBot msg) $ do
   let cmd = getCmd (messageContent msg)
       withAuth = auth adminId msg
+  liftIO $ withLog "Got command: " (pure cmd)
   case cmd of
     -- Admin only
     Right CreatePoll -> withAuth $ createPoll configRef strawPollToken chanId
     Right ShutUp -> withAuth $ stopPolls configRef msg
     Right (ScheduleHours slots) -> withAuth $ scheduleHours configRef slots msg
+    Right (ScheduleDays days) -> withAuth $ scheduleDays configRef days msg
     -- All users
     Right TellJoke -> tellJoke jokes msg
     Right UnknownCommand -> unknown msg
@@ -124,9 +127,9 @@ handleMessage Env{..} msg = unless (fromBot msg) $ do
 createPoll :: IORef P.Config -> Text -> ChannelId -> DiscordHandler ()
 createPoll configRef token chanId = do
   config <- liftIO $ readIORef configRef
-  guard (not . null $ config.days)
-  P.PollResponse url <- liftIO $ P.createPoll config token -- TODO retry if didn't succeed
-  void $ restCall (R.CreateMessage chanId url) -- TODO retry this too
+  unless (null config.days) $ do
+    P.PollResponse url <- liftIO $ P.createPoll config token -- TODO retry if didn't succeed
+    void $ restCall (R.CreateMessage chanId url) -- TODO retry this too
 
 stopPolls :: IORef P.Config -> Message -> DiscordHandler ()
 stopPolls configRef msg = do
@@ -136,7 +139,12 @@ stopPolls configRef msg = do
 scheduleHours :: IORef P.Config -> [Int] -> Message -> DiscordHandler ()
 scheduleHours configRef slots@[from, to] msg = do
   liftIO $ modifyConfig configRef (\currConf -> currConf{P.slots = slots})
-  reply msg (pack (printf "Timeslots were modified to: %d - %d" from to))
+  reply msg (T.pack (printf "Timeslots were modified to: %d - %d" from to))
+
+scheduleDays :: IORef P.Config -> [Int] -> Message -> DiscordHandler ()
+scheduleDays configRef days msg = do
+  liftIO $ modifyConfig configRef (\currConf -> currConf{P.days = days})
+  reply msg (T.pack ("Schedule was modified to:" <> concatMap ((' ' :) . P.showDay) days))
 
 modifyConfig :: IORef P.Config -> (P.Config -> P.Config) -> IO ()
 modifyConfig configRef f = do
