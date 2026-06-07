@@ -4,11 +4,13 @@
 module Bot (runBot) where
 
 import Command
+import Control.Applicative
 import Control.Monad (guard, unless, void, when)
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Data.Aeson
 import qualified Data.ByteString.Lazy as BS
+import Data.IORef
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -24,8 +26,6 @@ import Discord
 import qualified Discord.Requests as R
 import Discord.Types
 
-import Control.Applicative
-import Data.IORef
 import qualified Poll as P
 import ScheduleJob
 
@@ -119,6 +119,7 @@ handleMessage Env{..} msg = unless (fromBot msg) $ do
     Right ShutUp -> withAuth $ stopPolls configRef msg
     Right (ScheduleHours slots) -> withAuth $ scheduleHours configRef slots msg
     Right (ScheduleDays days) -> withAuth $ scheduleDays configRef days msg
+    Right GetSchedule -> withAuth $ getSchedule configRef msg
     -- All users
     Right TellJoke -> tellJoke jokes msg
     Right UnknownCommand -> unknown msg
@@ -145,6 +146,11 @@ scheduleDays :: IORef P.Config -> [Int] -> Message -> DiscordHandler ()
 scheduleDays configRef days msg = do
   liftIO $ modifyConfig configRef (\currConf -> currConf{P.days = days})
   reply msg (T.pack ("Schedule was modified to:" <> concatMap ((' ' :) . P.showDay) days))
+
+getSchedule :: IORef P.Config -> Message -> DiscordHandler ()
+getSchedule configRef msg = do
+  (P.Config days _) <- liftIO $ readIORef configRef
+  reply msg (T.pack ("Schedule for poll is:" <> concatMap ((' ' :) . P.showDay) days))
 
 modifyConfig :: IORef P.Config -> (P.Config -> P.Config) -> IO ()
 modifyConfig configRef f = do

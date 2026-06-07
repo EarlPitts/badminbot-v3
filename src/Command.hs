@@ -11,6 +11,7 @@ data Command
   | ShutUp
   | ScheduleHours [Int]
   | ScheduleDays [Int]
+  | GetSchedule
   | TellJoke
   | UnknownCommand
   deriving (Show)
@@ -28,6 +29,7 @@ pCommand =
           , pShutup
           , pScheduleHours
           , pScheduleDays
+          , pGetSchedule
           , pJoke
           , pUnknown
           ]
@@ -57,6 +59,9 @@ pScheduleDays = do
   days <- many1 (space *> pInt)
   guard (all (< 7) days)
   pure $ ScheduleDays days
+
+pGetSchedule :: Parser Command
+pGetSchedule = string "get schedule" $> GetSchedule
 
 pJoke :: Parser Command
 pJoke = string "joke" $> TellJoke
