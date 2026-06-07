@@ -120,6 +120,7 @@ handleMessage Env{..} msg = unless (fromBot msg) $ do
     Right (ScheduleHours slots) -> withAuth $ scheduleHours configRef slots msg
     Right (ScheduleDays days) -> withAuth $ scheduleDays configRef days msg
     Right GetSchedule -> withAuth $ getSchedule configRef msg
+    Right GetSlots -> withAuth $ getSlots configRef msg
     -- All users
     Right TellJoke -> tellJoke jokes msg
     Right UnknownCommand -> unknown msg
@@ -151,6 +152,11 @@ getSchedule :: IORef P.Config -> Message -> DiscordHandler ()
 getSchedule configRef msg = do
   (P.Config days _) <- liftIO $ readIORef configRef
   reply msg (T.pack ("Schedule for poll is:" <> concatMap ((' ' :) . P.showDay) days))
+
+getSlots :: IORef P.Config -> Message -> DiscordHandler ()
+getSlots configRef msg = do
+  (P.Config _ [from, to]) <- liftIO $ readIORef configRef
+  reply msg (T.pack (printf "Timeslots for poll: %d - %d" from to))
 
 modifyConfig :: IORef P.Config -> (P.Config -> P.Config) -> IO ()
 modifyConfig configRef f = do

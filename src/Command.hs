@@ -12,6 +12,7 @@ data Command
   | ScheduleHours [Int]
   | ScheduleDays [Int]
   | GetSchedule
+  | GetSlots
   | TellJoke
   | UnknownCommand
   deriving (Show)
@@ -30,6 +31,7 @@ pCommand =
           , pScheduleHours
           , pScheduleDays
           , pGetSchedule
+          , pGetSlots
           , pJoke
           , pUnknown
           ]
@@ -62,6 +64,9 @@ pScheduleDays = do
 
 pGetSchedule :: Parser Command
 pGetSchedule = string "get schedule" $> GetSchedule
+
+pGetSlots :: Parser Command
+pGetSlots = string "get timeslots" $> GetSlots
 
 pJoke :: Parser Command
 pJoke = string "joke" $> TellJoke
