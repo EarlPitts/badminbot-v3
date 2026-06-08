@@ -87,7 +87,7 @@ testJoke = do
   runReaderT (handleMessage fakeReply env msg) handle
 
   replyText <- readIORef replyTextRef
-  replyText `shouldBe` "unny joke"
+  replyText `shouldBe` "funny joke"
 
 mkFakeTime :: UTCTime -> IO (IORef UTCTime)
 mkFakeTime = newIORef
