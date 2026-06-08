@@ -42,7 +42,7 @@ main = do
 admin = DiscordId (Snowflake 123)
 user = DiscordId (Snowflake 234)
 
-mkFakeReply :: IO (IORef Text, Message -> Text -> DiscordHandler ())
+mkFakeReply :: IO (IORef Text, ChannelId -> Text -> DiscordHandler ())
 mkFakeReply = do
   replyRef <- newIORef ""
   pure

@@ -109,86 +109,63 @@ eventHandler env event = case event of
   _ -> return ()
 
 handleMessage ::
-  (Message -> Text -> DiscordHandler ()) ->
+  (ChannelId -> Text -> DiscordHandler ()) ->
   Env ->
   Message ->
   DiscordHandler ()
 handleMessage replyCmd Env{..} msg = unless (fromBot msg) $ do
   let cmd = getCmd (messageContent msg)
-      withAuth = auth adminId msg
+      channelId = messageChannelId msg
+      withAuth action = liftIO (auth adminId msg action) >>= replyCmd channelId
+      noAuth action = liftIO action >>= replyCmd channelId
   liftIO $ withLog "Got command: " (pure cmd)
   case cmd of
     -- Admin only
-    Right CreatePoll -> withAuth $ createPoll replyCmd configRef strawPollToken chanId
-    Right ShutUp -> withAuth $ stopPolls replyCmd configRef msg
-    Right (ScheduleHours slots) -> withAuth $ scheduleHours replyCmd configRef slots msg
-    Right (ScheduleDays days) -> withAuth $ scheduleDays replyCmd configRef days msg
-    Right GetSchedule -> withAuth $ getSchedule replyCmd configRef msg
-    Right GetSlots -> withAuth $ getSlots replyCmd configRef msg
+    Right CreatePoll -> liftIO (auth adminId msg (createPoll configRef strawPollToken)) >>= replyCmd chanId
+    Right ShutUp -> withAuth $ stopPolls configRef
+    Right (ScheduleHours slots) -> withAuth $ scheduleHours configRef slots
+    Right (ScheduleDays days) -> withAuth $ scheduleDays configRef days
+    Right GetSchedule -> withAuth $ getSchedule configRef
+    Right GetSlots -> withAuth $ getSlots configRef
     -- All users
-    Right (Call target) -> call replyCmd target msg
-    Right TellJoke -> tellJoke replyCmd jokes msg
-    Right UnknownCommand -> unknown replyCmd msg
+    Right (Call target) -> noAuth $ call target
+    Right TellJoke -> noAuth $ tellJoke jokes
+    Right UnknownCommand -> noAuth $ pure "Sorry, didn't understand :("
     Left _ -> pure ()
 
-createPoll ::
-  (Message -> Text -> DiscordHandler ()) ->
-  IORef P.Config ->
-  Text ->
-  ChannelId ->
-  DiscordHandler ()
-createPoll replyCmd configRef token chanId = do
+createPoll :: IORef P.Config -> Text -> IO Text
+createPoll configRef token = do
   config <- liftIO $ readIORef configRef
-  unless (null config.days) $ do
-    P.PollResponse url <- liftIO $ P.createPoll config token -- TODO retry if didn't succeed
-    void $ restCall (R.CreateMessage chanId url) -- TODO retry this too
+  if null config.days
+    then pure ""
+    else do
+      P.PollResponse url <- liftIO $ P.createPoll config token -- TODO retry if didn't succeed
+      pure url
 
-stopPolls ::
-  (Message -> Text -> DiscordHandler ()) ->
-  IORef P.Config ->
-  Message ->
-  DiscordHandler ()
-stopPolls replyCmd configRef msg = do
+stopPolls :: IORef P.Config -> IO Text
+stopPolls configRef = do
   liftIO $ modifyConfig configRef (\currConf -> currConf{P.days = []})
-  replyCmd msg "All right, turning off polls."
+  pure "All right, turning off polls."
 
-scheduleHours ::
-  (Message -> Text -> DiscordHandler ()) ->
-  IORef P.Config ->
-  [Int] ->
-  Message ->
-  DiscordHandler ()
-scheduleHours replyCmd configRef slots@[from, to] msg = do
-  liftIO $ modifyConfig configRef (\currConf -> currConf{P.slots = slots})
-  replyCmd msg (T.pack (printf "Timeslots were modified to: %d - %d" from to))
+scheduleHours :: IORef P.Config -> [Int] -> IO Text
+scheduleHours configRef slots@[from, to] = do
+  modifyConfig configRef (\currConf -> currConf{P.slots = slots})
+  pure (T.pack (printf "Timeslots were modified to: %d - %d" from to))
 
-scheduleDays ::
-  (Message -> Text -> DiscordHandler ()) ->
-  IORef P.Config ->
-  [Int] ->
-  Message ->
-  DiscordHandler ()
-scheduleDays replyCmd configRef days msg = do
-  liftIO $ modifyConfig configRef (\currConf -> currConf{P.days = days})
-  replyCmd msg (T.pack ("Schedule was modified to:" <> concatMap ((' ' :) . P.showDay) days))
+scheduleDays :: IORef P.Config -> [Int] -> IO Text
+scheduleDays configRef days = do
+  modifyConfig configRef (\currConf -> currConf{P.days = days})
+  pure (T.pack ("Schedule was modified to:" <> concatMap ((' ' :) . P.showDay) days))
 
-getSchedule ::
-  (Message -> Text -> DiscordHandler ()) ->
-  IORef P.Config ->
-  Message ->
-  DiscordHandler ()
-getSchedule replyCmd configRef msg = do
+getSchedule :: IORef P.Config -> IO Text
+getSchedule configRef = do
   (P.Config days _) <- liftIO $ readIORef configRef
-  replyCmd msg (T.pack ("Schedule for poll is:" <> concatMap ((' ' :) . P.showDay) days))
+  pure (T.pack ("Schedule for poll is:" <> concatMap ((' ' :) . P.showDay) days))
 
-getSlots ::
-  (Message -> Text -> DiscordHandler ()) ->
-  IORef P.Config ->
-  Message ->
-  DiscordHandler ()
-getSlots replyCmd configRef msg = do
+getSlots :: IORef P.Config -> IO Text
+getSlots configRef = do
   (P.Config _ [from, to]) <- liftIO $ readIORef configRef
-  replyCmd msg (T.pack (printf "Timeslots for poll: %d - %d" from to))
+  pure (T.pack (printf "Timeslots for poll: %d - %d" from to))
 
 modifyConfig :: IORef P.Config -> (P.Config -> P.Config) -> IO ()
 modifyConfig configRef f = do
@@ -196,37 +173,25 @@ modifyConfig configRef f = do
   newConfig <- readIORef configRef
   BS.writeFile configPath (encode newConfig)
 
-call ::
-  (Message -> Text -> DiscordHandler ()) ->
-  String ->
-  Message ->
-  DiscordHandler ()
-call replyCmd target msg = do
-  dow <- liftIO (Data.Time.dayOfWeek . utctDay <$> getCurrentTime)
-  if (target == "Tüskecsarnok" || target == "Tüske") && dow < Saturday
-    then replyCmd msg "They said they are full and then condescendingly reprimanded me for calling them in the first place during the working days of the week."
-    else replyCmd msg "Unfortunately, no response..."
+call :: String -> IO Text
+call target = do
+  dow <- Data.Time.dayOfWeek . utctDay <$> getCurrentTime
+  pure $
+    if (target == "Tüskecsarnok" || target == "Tüske") && dow < Saturday
+      then "They said they are full and then condescendingly reprimanded me for calling them in the first place during the working days of the week."
+      else "Unfortunately, no response..."
 
-tellJoke ::
-  (Message -> Text -> DiscordHandler ()) ->
-  [Text] ->
-  Message ->
-  DiscordHandler ()
-tellJoke replyCmd jokes msg = do
-  joke <- (jokes !!) <$> randomRIO (0, length jokes - 1)
-  replyCmd msg joke -- TODO retry this too
+tellJoke :: [Text] -> IO Text
+tellJoke jokes = (jokes !!) <$> randomRIO (0, length jokes - 1)
 
-unknown ::
-  (Message -> Text -> DiscordHandler ()) ->
-  Message ->
-  DiscordHandler ()
-unknown replyCmd msg = replyCmd msg "Sorry, didn't understand :("
+reply :: ChannelId -> Text -> DiscordHandler ()
+reply channelId = void . restCall . R.CreateMessage channelId
 
-reply :: Message -> Text -> DiscordHandler ()
-reply msg = void . restCall . R.CreateMessage (messageChannelId msg)
-
-auth :: UserId -> Message -> DiscordHandler () -> DiscordHandler ()
-auth admin msg = when (fromAdmin admin msg)
+auth :: UserId -> Message -> IO Text -> IO Text
+auth admin msg action =
+  if fromAdmin admin msg
+    then action
+    else pure "Sorry, cannot do that. :("
 
 fromBot :: Message -> Bool
 fromBot = userIsBot . messageAuthor
