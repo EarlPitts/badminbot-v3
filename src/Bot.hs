@@ -1,6 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-
 module Bot where
 
 import Command
@@ -101,37 +98,35 @@ schedulePolls env = do
 
 eventHandler :: Env -> Event -> DiscordHandler ()
 eventHandler env event = case event of
-  MessageCreate msg -> handleMessage reply env msg
+  MessageCreate msg -> handleMessage env msg
   -- MessageCreate m -> when (isPing m && not (fromBot m)) $ do
   --   void $ restCall (R.CreateReaction (messageChannelId m, messageId m) "eyes")
   --   threadDelay (2 * 10 ^ 6)
   --   void $ restCall (R.CreateMessage (messageChannelId m) "Pong!")
   _ -> return ()
 
-handleMessage ::
-  (ChannelId -> Text -> DiscordHandler ()) ->
-  Env ->
-  Message ->
-  DiscordHandler ()
-handleMessage replyCmd Env{..} msg = unless (fromBot msg) $ do
+handleMessage :: Env -> Message -> DiscordHandler ()
+handleMessage env@Env{..} msg = unless (fromBot msg) $ do
   let cmd = getCmd (messageContent msg)
-      channelId = messageChannelId msg
-      withAuth action = liftIO (auth adminId msg action) >>= replyCmd channelId
-      noAuth action = liftIO action >>= replyCmd channelId
+      withAuth = auth adminId msg
   liftIO $ withLog "Got command: " (pure cmd)
   case cmd of
-    -- Admin only
-    Right CreatePoll -> liftIO (auth adminId msg (createPoll configRef strawPollToken)) >>= replyCmd chanId
-    Right ShutUp -> withAuth $ stopPolls configRef
-    Right (ScheduleHours slots) -> withAuth $ scheduleHours configRef slots
-    Right (ScheduleDays days) -> withAuth $ scheduleDays configRef days
-    Right GetSchedule -> withAuth $ getSchedule configRef
-    Right GetSlots -> withAuth $ getSlots configRef
-    -- All users
-    Right (Call target) -> noAuth $ call target
-    Right TellJoke -> noAuth $ tellJoke jokes
-    Right UnknownCommand -> noAuth $ pure "Sorry, didn't understand :("
+    Right cmd' -> liftIO (handleCommand env withAuth cmd') >>= reply (messageChannelId msg)
     Left _ -> pure ()
+
+handleCommand :: Env -> (IO Text -> IO Text) -> Command -> IO Text
+handleCommand Env{..} withAuth = \case
+  -- Admin only
+  CreatePoll -> withAuth $ createPoll configRef strawPollToken
+  ShutUp -> withAuth $ stopPolls configRef
+  (ScheduleHours slots) -> withAuth $ scheduleHours configRef slots
+  (ScheduleDays days) -> withAuth $ scheduleDays configRef days
+  GetSchedule -> withAuth $ getSchedule configRef
+  GetSlots -> withAuth $ getSlots configRef
+  -- All users
+  (Call target) -> call target
+  TellJoke -> tellJoke jokes
+  UnknownCommand -> pure "Sorry, didn't understand :("
 
 createPoll :: IORef P.Config -> Text -> IO Text
 createPoll configRef token = do
