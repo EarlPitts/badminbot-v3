@@ -15,6 +15,8 @@ import GHC.Conc (threadDelay)
 import qualified Poll as P
 import ScheduleJob
 import Test.Hspec
+import Test.Hspec.QuickCheck
+import Test.QuickCheck
 
 main :: IO ()
 main = do
@@ -29,6 +31,10 @@ main = do
         testShutUp
       it "should schedule the specified timeslots" do
         testScheduleHours
+      prop "should schedule the specified days" do
+        forAll (listOf1 (choose (0, 6))) testScheduleDays
+      prop "should not schedule the specified days when data is invalid" do
+        testScheduleDaysInvalid . filter (\n -> n < 0 || n > 6)
 
 testJoke :: IO ()
 testJoke = do
@@ -72,6 +78,29 @@ testScheduleHours = do
   modifiedConfig <- readIORef configRef
   modifiedConfig `shouldBe` P.Config P.defaultConfig.days [4, 16]
   replyMsg `shouldBe` "Timeslots were modified to: 4 - 16"
+
+testScheduleDays :: [Int] -> IO ()
+testScheduleDays days = do
+  configRef <- newIORef P.defaultConfig
+  let cmd = ScheduleDays days
+      env = Env{configRef = configRef}
+
+  _ <- handleCommand env id cmd
+
+  modifiedConfig <- readIORef configRef
+  modifiedConfig `shouldBe` P.Config days P.defaultConfig.slots
+
+testScheduleDaysInvalid :: [Int] -> IO ()
+testScheduleDaysInvalid days = do
+  configRef <- newIORef P.defaultConfig
+  let cmd = ScheduleDays days
+      env = Env{configRef = configRef}
+
+  replyMsg <- handleCommand env id cmd
+
+  modifiedConfig <- readIORef configRef
+  replyMsg `shouldBe` "Days should be numbers between 0 and 6, please!"
+  modifiedConfig `shouldBe` P.defaultConfig
 
 pollServiceStub :: a -> b -> IO P.PollResponse
 pollServiceStub _ _ = pure (P.PollResponse "poll url")

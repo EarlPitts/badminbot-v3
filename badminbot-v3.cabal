@@ -72,5 +72,6 @@ test-suite badminbot-v3-test
     , discord-haskell
     , hspec
     , mtl
+    , QuickCheck
     , text
     , time
