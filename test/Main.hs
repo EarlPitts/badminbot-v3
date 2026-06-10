@@ -25,6 +25,10 @@ main = do
         testJoke
       it "should reply with the poll url" do
         testCreatePoll
+      it "should turn off polls" do
+        testShutUp
+      it "should schedule the specified timeslots" do
+        testScheduleHours
 
 testJoke :: IO ()
 testJoke = do
@@ -44,6 +48,30 @@ testCreatePoll = do
   replyMsg <- handleCommand env id cmd
 
   replyMsg `shouldBe` "poll url"
+
+testShutUp :: IO ()
+testShutUp = do
+  configRef <- newIORef P.defaultConfig
+  let cmd = ShutUp
+      env = Env{configRef = configRef}
+
+  replyMsg <- handleCommand env id cmd
+
+  modifiedConfig <- readIORef configRef
+  modifiedConfig `shouldBe` P.Config [] P.defaultConfig.slots
+  replyMsg `shouldBe` "All right, turning off polls."
+
+testScheduleHours :: IO ()
+testScheduleHours = do
+  configRef <- newIORef P.defaultConfig
+  let cmd = ScheduleHours [4, 16]
+      env = Env{configRef = configRef}
+
+  replyMsg <- handleCommand env id cmd
+
+  modifiedConfig <- readIORef configRef
+  modifiedConfig `shouldBe` P.Config P.defaultConfig.days [4, 16]
+  replyMsg `shouldBe` "Timeslots were modified to: 4 - 16"
 
 pollServiceStub :: a -> b -> IO P.PollResponse
 pollServiceStub _ _ = pure (P.PollResponse "poll url")

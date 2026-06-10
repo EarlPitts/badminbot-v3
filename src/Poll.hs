@@ -20,7 +20,7 @@ data Config = Config
   { days :: [Int]
   , slots :: [Int]
   }
-  deriving (Show, FromJSON, ToJSON, Generic)
+  deriving (Eq, Show, FromJSON, ToJSON, Generic)
 
 newtype PollResponse = PollResponse
   { url :: Text
