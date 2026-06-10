@@ -12,6 +12,7 @@ import Data.IORef
 import Data.Text (Text)
 import Data.Time
 import GHC.Conc (threadDelay)
+import qualified Poll as P
 import ScheduleJob
 import Test.Hspec
 
@@ -19,9 +20,11 @@ main :: IO ()
 main = do
   hspec do
     -- Integration
-    describe "HandleMessage" do
+    describe "HandleCommand" do
       it "should reply with a joke" do
         testJoke
+      it "should reply with the poll url" do
+        testCreatePoll
 
 testJoke :: IO ()
 testJoke = do
@@ -31,6 +34,19 @@ testJoke = do
   replyMsg <- handleCommand env id cmd
 
   replyMsg `shouldBe` "funny joke"
+
+testCreatePoll :: IO ()
+testCreatePoll = do
+  configRef <- newIORef P.defaultConfig
+  let cmd = CreatePoll
+      env = Env{createPollFun = pollServiceStub, configRef = configRef}
+
+  replyMsg <- handleCommand env id cmd
+
+  replyMsg `shouldBe` "poll url"
+
+pollServiceStub :: a -> b -> IO P.PollResponse
+pollServiceStub _ _ = pure (P.PollResponse "poll url")
 
 mkFakeTime :: UTCTime -> IO (IORef UTCTime)
 mkFakeTime = newIORef
