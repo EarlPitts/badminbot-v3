@@ -151,8 +151,11 @@ scheduleHours configRef slots@[from, to] = do
 
 scheduleDays :: IORef P.Config -> [Int] -> IO Text
 scheduleDays configRef days = do
-  modifyConfig configRef (\currConf -> currConf{P.days = days})
-  pure (T.pack ("Schedule was modified to:" <> concatMap ((' ' :) . P.showDay) days))
+  if any (\n -> n < 0 || n > 6) days || null days
+    then pure "Days should be numbers between 0 and 6, please!"
+    else do
+      modifyConfig configRef (\currConf -> currConf{P.days = days})
+      pure (T.pack ("Schedule was modified to:" <> concatMap ((' ' :) . P.showDay) days))
 
 getSchedule :: IORef P.Config -> IO Text
 getSchedule configRef = do
