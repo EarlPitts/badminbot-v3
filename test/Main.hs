@@ -10,6 +10,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Data.IORef
 import Data.Text (Text)
+import qualified Data.Text as T
 import Data.Time
 import GHC.Conc (threadDelay)
 import qualified Poll as P
@@ -35,6 +36,8 @@ main = do
         forAll (listOf1 (choose (0, 6))) testScheduleDays
       prop "should not schedule the specified days when data is invalid" do
         testScheduleDaysInvalid . filter (\n -> n < 0 || n > 6)
+      prop "reply with the scheduled days" do
+        forAll (listOf1 (choose (0, 6))) testGetSchedule
 
 testJoke :: IO ()
 testJoke = do
@@ -101,6 +104,16 @@ testScheduleDaysInvalid days = do
   modifiedConfig <- readIORef configRef
   replyMsg `shouldBe` "Days should be numbers between 0 and 6, please!"
   modifiedConfig `shouldBe` P.defaultConfig
+
+testGetSchedule :: [Int] -> IO ()
+testGetSchedule days = do
+  configRef <- newIORef $ P.Config days []
+  let cmd = GetSchedule
+      env = Env{configRef = configRef}
+
+  replyMsg <- handleCommand env id cmd
+
+  T.unpack replyMsg `shouldContain` "Schedule for poll is:"
 
 pollServiceStub :: a -> b -> IO P.PollResponse
 pollServiceStub _ _ = pure (P.PollResponse "poll url")
