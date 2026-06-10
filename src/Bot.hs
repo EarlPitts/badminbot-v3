@@ -35,6 +35,7 @@ data Env = Env
   , adminId :: UserId
   , pollPublishTime :: DayTime
   , strawPollToken :: Text
+  , createPollFun :: P.Config -> Text -> IO P.PollResponse
   }
 
 type App = ReaderT Env IO
@@ -57,6 +58,7 @@ runBot = do
       <|> withLog "Using default config" (pure P.defaultConfig)
   configRef <- newIORef config
   let pollPublishTime = DayTime Thursday (TimeOfDay 11 0 0)
+      createPollFun = P.createPoll
   runReaderT badminbot Env{..}
 
 badminbot :: App ()
@@ -117,7 +119,7 @@ handleMessage env@Env{..} msg = unless (fromBot msg) $ do
 handleCommand :: Env -> (IO Text -> IO Text) -> Command -> IO Text
 handleCommand Env{..} withAuth = \case
   -- Admin only
-  CreatePoll -> withAuth $ createPoll configRef strawPollToken
+  CreatePoll -> withAuth $ createPoll createPollFun configRef strawPollToken
   ShutUp -> withAuth $ stopPolls configRef
   (ScheduleHours slots) -> withAuth $ scheduleHours configRef slots
   (ScheduleDays days) -> withAuth $ scheduleDays configRef days
@@ -128,18 +130,18 @@ handleCommand Env{..} withAuth = \case
   TellJoke -> tellJoke jokes
   UnknownCommand -> pure "Sorry, didn't understand :("
 
-createPoll :: IORef P.Config -> Text -> IO Text
-createPoll configRef token = do
-  config <- liftIO $ readIORef configRef
+createPoll :: (P.Config -> Text -> IO P.PollResponse) -> IORef P.Config -> Text -> IO Text
+createPoll createPollFun configRef token = do
+  config <- readIORef configRef
   if null config.days
     then pure ""
     else do
-      P.PollResponse url <- liftIO $ P.createPoll config token -- TODO retry if didn't succeed
+      P.PollResponse url <- createPollFun config token -- TODO retry if didn't succeed
       pure url
 
 stopPolls :: IORef P.Config -> IO Text
 stopPolls configRef = do
-  liftIO $ modifyConfig configRef (\currConf -> currConf{P.days = []})
+  modifyConfig configRef (\currConf -> currConf{P.days = []})
   pure "All right, turning off polls."
 
 scheduleHours :: IORef P.Config -> [Int] -> IO Text
@@ -154,12 +156,12 @@ scheduleDays configRef days = do
 
 getSchedule :: IORef P.Config -> IO Text
 getSchedule configRef = do
-  (P.Config days _) <- liftIO $ readIORef configRef
+  (P.Config days _) <- readIORef configRef
   pure (T.pack ("Schedule for poll is:" <> concatMap ((' ' :) . P.showDay) days))
 
 getSlots :: IORef P.Config -> IO Text
 getSlots configRef = do
-  (P.Config _ [from, to]) <- liftIO $ readIORef configRef
+  (P.Config _ [from, to]) <- readIORef configRef
   pure (T.pack (printf "Timeslots for poll: %d - %d" from to))
 
 modifyConfig :: IORef P.Config -> (P.Config -> P.Config) -> IO ()
