@@ -21,7 +21,7 @@
         brainfuck-src = pkgs.fetchFromGitHub {
           owner = "EarlPitts";
           repo = "brainfuck-interpreter";
-          rev = "master";
+          rev = "b46db320e58e2e04dc359eaada905159d3bacee1";
           hash = "sha256-AWktL/X4T8/r1a/0PDA45gihUt3yuwJRl/xOzWMGR8s=";
         };
 
