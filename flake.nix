@@ -17,10 +17,24 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         haskellPackages = pkgs.haskell.packages.ghc966;
+
+        brainfuck-src = pkgs.fetchFromGitHub {
+          owner = "EarlPitts";
+          repo = "brainfuck-interpreter";
+          rev = "master";
+          hash = "sha256-AWktL/X4T8/r1a/0PDA45gihUt3yuwJRl/xOzWMGR8s=";
+        };
+
+        myHaskellPackages = haskellPackages.override {
+          overrides = self: super: {
+            brainfuck-interpreter = self.callCabal2nix "brainfuck-interpreter" brainfuck-src { };
+          };
+        };
       in
       {
-        packages.default = pkgs.haskell.lib.justStaticExecutables
-          (haskellPackages.callCabal2nix "badminbot" ./. {});
+        packages.default = pkgs.haskell.lib.justStaticExecutables (
+          myHaskellPackages.callCabal2nix "badminbot" ./. { }
+        );
 
         devShells.default = pkgs.mkShell {
           packages = with haskellPackages; [
