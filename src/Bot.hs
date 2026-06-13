@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeApplications #-}
+
 module Bot where
 
 import Command
@@ -16,13 +18,16 @@ import System.Environment
 import System.Exit (exitFailure)
 import System.IO (BufferMode (LineBuffering), hSetBuffering, stdout)
 import System.Random (randomRIO)
+import System.Timeout (timeout)
 import Text.Printf (printf)
 import Prelude hiding (lines, log)
 
+import BrainFuck (eval, parse)
 import Discord
 import qualified Discord.Requests as R
 import Discord.Types
 
+import Control.Exception
 import qualified Poll as P
 import ScheduleJob
 
@@ -128,6 +133,7 @@ handleCommand Env{..} withAuth = \case
   -- All users
   (Call target) -> call target
   TellJoke -> tellJoke jokes
+  Eval progStr -> evalProgram progStr
   UnknownCommand -> pure "Sorry, didn't understand :("
 
 createPoll :: (P.Config -> Text -> IO P.PollResponse) -> IORef P.Config -> Text -> IO Text
@@ -183,6 +189,12 @@ call target = do
 
 tellJoke :: [Text] -> IO Text
 tellJoke jokes = (jokes !!) <$> randomRIO (0, length jokes - 1)
+
+evalProgram :: String -> IO Text
+evalProgram progStr =
+  timeout 2000000 (evaluate (T.pack $ eval [] (parse progStr))) >>= \case
+    Nothing -> pure "Give me something that terminates!"
+    Just result -> pure result
 
 reply :: ChannelId -> Text -> DiscordHandler ()
 reply channelId = void . restCall . R.CreateMessage channelId

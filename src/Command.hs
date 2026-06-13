@@ -15,6 +15,7 @@ data Command
   | GetSlots
   | Call String
   | TellJoke
+  | Eval String
   | UnknownCommand
   deriving (Show)
 
@@ -34,6 +35,7 @@ pCommand =
           , pGetSchedule
           , pGetSlots
           , pCall
+          , pEval
           , pJoke
           , pUnknown
           ]
@@ -75,6 +77,9 @@ pCall = fmap Call $ string "call " *> many1 letter
 
 pJoke :: Parser Command
 pJoke = string "joke" $> TellJoke
+
+pEval :: Parser Command
+pEval = fmap Eval $ string "eval " *> many1 (oneOf "+-<>[],.")
 
 pUnknown :: Parser Command
 pUnknown = many1 anyChar $> UnknownCommand
