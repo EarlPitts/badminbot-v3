@@ -21,8 +21,8 @@
         brainfuck-src = pkgs.fetchFromGitHub {
           owner = "EarlPitts";
           repo = "brainfuck-interpreter";
-          rev = "b46db320e58e2e04dc359eaada905159d3bacee1";
-          hash = "sha256-AWktL/X4T8/r1a/0PDA45gihUt3yuwJRl/xOzWMGR8s=";
+          rev = "7f64fbf52e7cd128a251205216ba56c9f5046f69";
+          hash = "sha256-mtyfGdt0F2cqEPdPRT2lYz88XHP5HzeCiNJr+nnSRUs=";
         };
 
         myHaskellPackages = haskellPackages.override {
