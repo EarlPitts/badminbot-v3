@@ -1,10 +1,8 @@
-{-# LANGUAGE TypeApplications #-}
-
 module Bot where
 
 import Command
 import Control.Applicative
-import Control.Monad (guard, unless, void, when)
+import Control.Monad (guard, unless, void)
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Data.Aeson
@@ -43,14 +41,12 @@ data Env = Env
   , createPollFun :: P.Config -> Text -> IO P.PollResponse
   }
 
-type App = ReaderT Env IO
-
 configPath, jokesPath :: String
 jokesPath = "jokes.txt"
 configPath = "config.json"
 
-runBot :: IO ()
-runBot = do
+main :: IO ()
+main = do
   hSetBuffering stdout LineBuffering
   jokes <- T.lines <$> TIO.readFile jokesPath
   timeZone <- getCurrentTimeZone
@@ -64,23 +60,21 @@ runBot = do
   configRef <- newIORef config
   let pollPublishTime = DayTime Thursday (TimeOfDay 11 0 0)
       createPollFun = P.createPoll
-  runReaderT badminbot Env{..}
+  runBot Env{..}
 
-badminbot :: App ()
-badminbot = do
-  liftIO $ putStrLn "started..."
-  env <- ask
+runBot :: Env -> IO ()
+runBot env = do
+  putStrLn "started..."
   userFacingError <-
-    liftIO $
-      runDiscord $
-        def
-          { discordToken = "Bot " <> env.token
-          , discordOnStart = schedulePolls env
-          , discordOnEvent = eventHandler env
-          , discordOnLog = \s -> TIO.putStrLn s >> TIO.putStrLn ""
-          }
-  liftIO $ TIO.putStrLn userFacingError
-  liftIO exitFailure
+    runDiscord $
+      def
+        { discordToken = "Bot " <> env.token
+        , discordOnStart = schedulePolls env
+        , discordOnEvent = eventHandler env
+        , discordOnLog = TIO.putStrLn
+        }
+  TIO.putStrLn userFacingError
+  exitFailure
 
 -- userFacingError is an unrecoverable error
 -- put normal 'cleanup' code in discordOnEnd (see examples)
@@ -106,10 +100,6 @@ schedulePolls env = do
 eventHandler :: Env -> Event -> DiscordHandler ()
 eventHandler env event = case event of
   MessageCreate msg -> handleMessage env msg
-  -- MessageCreate m -> when (isPing m && not (fromBot m)) $ do
-  --   void $ restCall (R.CreateReaction (messageChannelId m, messageId m) "eyes")
-  --   threadDelay (2 * 10 ^ 6)
-  --   void $ restCall (R.CreateMessage (messageChannelId m) "Pong!")
   _ -> return ()
 
 handleMessage :: Env -> Message -> DiscordHandler ()
