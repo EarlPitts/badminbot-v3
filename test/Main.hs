@@ -3,13 +3,10 @@
 
 module Main (main) where
 
-import Bot
+import Bot hiding (main)
 import Command
 import Control.Concurrent (newEmptyMVar, putMVar, readMVar)
-import Control.Monad.IO.Class
-import Control.Monad.Reader
 import Data.IORef
-import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time
 import GHC.Conc (threadDelay)
