@@ -20,7 +20,7 @@ import System.Timeout (timeout)
 import Text.Printf (printf)
 import Prelude hiding (lines, log)
 
-import BrainFuck (eval, parse)
+import BrainFuck (evalWith)
 import Discord
 import qualified Discord.Requests as R
 import Discord.Types
@@ -182,7 +182,7 @@ tellJoke jokes = (jokes !!) <$> randomRIO (0, length jokes - 1)
 
 evalProgram :: String -> IO Text
 evalProgram progStr =
-  timeout 2000000 (evaluate (T.pack $ eval [] (parse progStr))) >>= \case
+  timeout 2000000 (evaluate (T.pack $ evalWith progStr "")) >>= \case
     Nothing -> pure "Give me something that terminates!"
     Just result -> pure result
 

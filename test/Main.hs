@@ -35,6 +35,10 @@ main = do
         testScheduleDaysInvalid . filter (\n -> n < 0 || n > 6)
       prop "reply with the scheduled days" do
         forAll (listOf1 (choose (0, 6))) testGetSchedule
+      it "reply with hello world" do
+        testEval
+      it "should handle non-terminating programs" do
+        testEvalNonTerminating
 
 testJoke :: IO ()
 testJoke = do
@@ -111,6 +115,24 @@ testGetSchedule days = do
   replyMsg <- handleCommand env id cmd
 
   T.unpack replyMsg `shouldContain` "Schedule for poll is:"
+
+testEval :: IO ()
+testEval = do
+  let cmd = Eval "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++."
+      env = Env{}
+
+  replyMsg <- handleCommand env id cmd
+
+  T.unpack replyMsg `shouldBe` "Hello World!\n"
+
+testEvalNonTerminating :: IO ()
+testEvalNonTerminating = do
+  let cmd = Eval "+[]"
+      env = Env{}
+
+  replyMsg <- handleCommand env id cmd
+
+  T.unpack replyMsg `shouldBe` "Give me something that terminates!"
 
 pollServiceStub :: a -> b -> IO P.PollResponse
 pollServiceStub _ _ = pure (P.PollResponse "poll url")
